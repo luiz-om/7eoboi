@@ -1,32 +1,33 @@
 import { useState, useEffect } from "react";
 
-export default function ArenaScreen({ duplas, ranking, tempo }) {
+export default function ArenaScreen({ duplas, ranking, tempo, provaFinalizada = false }) {
+  const provaIdTelao = new URLSearchParams(window.location.search).get("prova");
+  const carregarProvaAtual = () => {
+    try {
+      const provas = JSON.parse(localStorage.getItem("provas") || "[]");
+      const provaAtualId = provaIdTelao || localStorage.getItem("provaAtualId");
+      const prova = provas.find((item) => item.id === provaAtualId);
+      const duplasProva = prova?.duplas || duplas;
+      const rankingProva = [...duplasProva]
+        .filter((d) => d.bois !== null && d.bois !== "SAT")
+        .sort((a, b) =>
+          b.bois !== a.bois ? b.bois - a.bois : a.tempo - b.tempo,
+        );
+      return {
+        duplas: duplasProva,
+        ranking: rankingProva.length > 0 ? rankingProva : ranking,
+        nome: prova?.nome || "Ranch Sorting",
+      };
+    } catch {
+      return { duplas, ranking, nome: "Ranch Sorting" };
+    }
+  };
   const [animacoes, setAnimacoes] = useState(new Set());
   const [tempoAtualizado, setTempoAtualizado] = useState(tempo);
-  const [duplasAtualizado, setDuplasAtualizado] = useState(() => {
-    try {
-      const saved = localStorage.getItem("duplas");
-      return saved ? JSON.parse(saved) : duplas;
-    } catch {
-      return duplas;
-    }
-  });
-  const [rankingAtualizado, setRankingAtualizado] = useState(() => {
-    try {
-      const saved = localStorage.getItem("duplas");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return [...parsed]
-          .filter((d) => d.bois !== null)
-          .sort((a, b) =>
-            b.bois !== a.bois ? b.bois - a.bois : a.tempo - b.tempo,
-          );
-      }
-      return ranking;
-    } catch {
-      return ranking;
-    }
-  });
+  const estadoInicial = carregarProvaAtual();
+  const [duplasAtualizado, setDuplasAtualizado] = useState(estadoInicial.duplas);
+  const [rankingAtualizado, setRankingAtualizado] = useState(estadoInicial.ranking);
+  const [nomeProva, setNomeProva] = useState(estadoInicial.nome);
 
   // Sincroniza tempo com localStorage
   useEffect(() => {
@@ -41,23 +42,10 @@ export default function ArenaScreen({ duplas, ranking, tempo }) {
         setTempoAtualizado(novoTempo);
       }
 
-      const novasDuplas = localStorage.getItem("duplas");
-      if (novasDuplas) {
-        try {
-          const duplasParsed = JSON.parse(novasDuplas);
-          setDuplasAtualizado(duplasParsed);
-
-          // Recalcula ranking
-          const novoRanking = [...duplasParsed]
-            .filter((d) => d.bois !== null)
-            .sort((a, b) =>
-              b.bois !== a.bois ? b.bois - a.bois : a.tempo - b.tempo,
-            );
-          setRankingAtualizado(novoRanking);
-        } catch (e) {
-          console.error("Erro ao parsear duplas:", e);
-        }
-      }
+      const estado = carregarProvaAtual();
+      setDuplasAtualizado(estado.duplas);
+      setRankingAtualizado(estado.ranking);
+      setNomeProva(estado.nome);
     };
 
     window.addEventListener("storage", handleStorageChange);
@@ -76,8 +64,10 @@ export default function ArenaScreen({ duplas, ranking, tempo }) {
 
   const proximaDupla = duplasAtualizado.find((d) => d.bois === null);
   const top5 = rankingAtualizado.slice(0, 5);
+  const top3 = rankingAtualizado.slice(0, 3);
   const medalhas = ["🥇", "🥈", "🥉"];
   const temPendentes = duplasAtualizado.some((d) => d.bois === null);
+  const provaEncerrada = provaFinalizada || !temPendentes;
 
   const fmt = (t) => (t == null ? "—" : t.toFixed(3) + "s");
 
@@ -87,7 +77,7 @@ export default function ArenaScreen({ duplas, ranking, tempo }) {
       <div className="arena-header">
         <div className="arena-header-content">
           <div className="arena-title">🐄 Ranch Sorting 🐴</div>
-          <div className="arena-subtitle">Manejo Soluções</div>
+          <div className="arena-subtitle">{nomeProva}</div>
         </div>
       </div>
 
@@ -140,13 +130,34 @@ export default function ArenaScreen({ duplas, ranking, tempo }) {
             ) : null}
           </div>
         ) : (
-          <div className="arena-next arena-next-complete">
-            <div className="arena-next-label">✅ PROVA CONCLUÍDA</div>
-            <div
-              style={{ marginTop: "8px", fontSize: "14px", color: "#22C55E" }}
-            >
-              {rankingAtualizado.length} duplas finalizadas
+          <div className="arena-complete-stack">
+            <div className="arena-next arena-next-complete">
+              <div className="arena-next-label">✅ PROVA CONCLUÍDA</div>
+              <div
+                style={{ marginTop: "8px", fontSize: "14px", color: "#22C55E" }}
+              >
+                {rankingAtualizado.length} duplas finalizadas
+              </div>
             </div>
+
+            {provaEncerrada && top3.length > 0 ? (
+              <div className="arena-podium">
+                <div className="arena-podium-title">Resultado Final</div>
+                <div className="arena-podium-grid">
+                  {top3.map((dp, index) => (
+                    <div key={dp.id} className="arena-podium-card">
+                      <div className="arena-podium-medal">{medalhas[index]}</div>
+                      <div className="arena-podium-name">
+                        {dp.cavaleiro1} & {dp.cavaleiro2}
+                      </div>
+                      <div className="arena-podium-meta">
+                        {dp.bois} bois • {fmt(dp.tempo)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
       </div>
@@ -293,6 +304,67 @@ export default function ArenaScreen({ duplas, ranking, tempo }) {
         .arena-next-complete {
           border-color: #22C55E;
           background: linear-gradient(135deg, #0F1F0F 0%, #1A2A1A 100%);
+        }
+
+        .arena-complete-stack {
+          width: 100%;
+          max-width: 1080px;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+          align-items: center;
+        }
+
+        .arena-podium {
+          width: 100%;
+          background: linear-gradient(135deg, rgba(20, 16, 0, 0.95) 0%, rgba(28, 24, 0, 0.92) 100%);
+          border: 2px solid rgba(244, 197, 66, 0.25);
+          border-radius: 18px;
+          padding: 22px;
+          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+        }
+
+        .arena-podium-title {
+          text-align: center;
+          font-size: clamp(18px, 2.2vw, 30px);
+          color: #F4C542;
+          text-transform: uppercase;
+          letter-spacing: 2px;
+          font-weight: 700;
+          margin-bottom: 16px;
+        }
+
+        .arena-podium-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 14px;
+        }
+
+        .arena-podium-card {
+          background: rgba(11, 11, 11, 0.7);
+          border: 1px solid rgba(244, 197, 66, 0.18);
+          border-radius: 14px;
+          padding: 18px 16px;
+          text-align: center;
+        }
+
+        .arena-podium-medal {
+          font-size: clamp(28px, 3vw, 40px);
+          margin-bottom: 8px;
+        }
+
+        .arena-podium-name {
+          font-size: clamp(16px, 1.8vw, 24px);
+          color: #F0F0F0;
+          font-weight: 700;
+          line-height: 1.2;
+        }
+
+        .arena-podium-meta {
+          margin-top: 8px;
+          font-size: clamp(13px, 1.3vw, 18px);
+          color: #22C55E;
+          letter-spacing: 0.5px;
         }
 
         .arena-next-label {
@@ -540,6 +612,10 @@ export default function ArenaScreen({ duplas, ranking, tempo }) {
             padding: 40px 16px;
           }
 
+          .arena-podium-grid {
+            grid-template-columns: 1fr;
+          }
+
           .arena-timer {
             font-size: clamp(60px, 12vw, 120px) !important;
           }
@@ -666,6 +742,10 @@ export default function ArenaScreen({ duplas, ranking, tempo }) {
 
           .arena-next-riders {
             font-size: clamp(12px, 3vw, 24px);
+          }
+
+          .arena-podium {
+            padding: 14px 12px;
           }
 
           .arena-ranking {
