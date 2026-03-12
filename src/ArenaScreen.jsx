@@ -17,8 +17,10 @@ export default function ArenaScreen({ duplas, ranking, tempo }) {
       if (saved) {
         const parsed = JSON.parse(saved);
         return [...parsed]
-          .filter(d => d.bois !== null)
-          .sort((a, b) => b.bois !== a.bois ? b.bois - a.bois : a.tempo - b.tempo);
+          .filter((d) => d.bois !== null)
+          .sort((a, b) =>
+            b.bois !== a.bois ? b.bois - a.bois : a.tempo - b.tempo,
+          );
       }
       return ranking;
     } catch {
@@ -38,17 +40,19 @@ export default function ArenaScreen({ duplas, ranking, tempo }) {
       if (novoTempo) {
         setTempoAtualizado(novoTempo);
       }
-      
+
       const novasDuplas = localStorage.getItem("duplas");
       if (novasDuplas) {
         try {
           const duplasParsed = JSON.parse(novasDuplas);
           setDuplasAtualizado(duplasParsed);
-          
+
           // Recalcula ranking
           const novoRanking = [...duplasParsed]
-            .filter(d => d.bois !== null)
-            .sort((a, b) => b.bois !== a.bois ? b.bois - a.bois : a.tempo - b.tempo);
+            .filter((d) => d.bois !== null)
+            .sort((a, b) =>
+              b.bois !== a.bois ? b.bois - a.bois : a.tempo - b.tempo,
+            );
           setRankingAtualizado(novoRanking);
         } catch (e) {
           console.error("Erro ao parsear duplas:", e);
@@ -70,12 +74,12 @@ export default function ArenaScreen({ duplas, ranking, tempo }) {
     return () => clearTimeout(timer);
   }, [rankingAtualizado]);
 
-  const proximaDupla = duplasAtualizado.find(d => d.bois === null);
+  const proximaDupla = duplasAtualizado.find((d) => d.bois === null);
   const top5 = rankingAtualizado.slice(0, 5);
   const medalhas = ["🥇", "🥈", "🥉"];
-  const temPendentes = duplasAtualizado.some(d => d.bois === null);
+  const temPendentes = duplasAtualizado.some((d) => d.bois === null);
 
-  const fmt = t => t == null ? "—" : t.toFixed(3) + "s";
+  const fmt = (t) => (t == null ? "—" : t.toFixed(3) + "s");
 
   return (
     <div className="arena-screen">
@@ -97,12 +101,14 @@ export default function ArenaScreen({ duplas, ranking, tempo }) {
 
         {/* DUPLA ATUAL E PRÓXIMA */}
         {temPendentes && proximaDupla ? (
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "80px", width: "100%", "@media (max-width: 1024px)": { gap: "40px" }, "@media (max-width: 768px)": { gap: "20px", gridTemplateColumns: "1fr" } }}>
+          <div className="arena-competitors-wrapper">
             {/* DUPLA ATUAL */}
-            <div className="arena-next">
+            <div className="arena-next arena-current-highlight">
               <div className="arena-next-label">🐴 DUPLA ATUAL</div>
               <div className="arena-next-riders">
-                {proximaDupla.cavaleiro1} <span className="arena-separator">&</span> {proximaDupla.cavaleiro2}
+                {proximaDupla.cavaleiro1}{" "}
+                <span className="arena-separator">&</span>{" "}
+                {proximaDupla.cavaleiro2}
               </div>
               <div className="arena-next-horses">
                 🐴 {proximaDupla.cavalo1} • {proximaDupla.cavalo2}
@@ -110,14 +116,25 @@ export default function ArenaScreen({ duplas, ranking, tempo }) {
             </div>
 
             {/* PRÓXIMA DUPLA */}
-            {duplasAtualizado.filter(d => d.bois === null).length > 1 ? (
-              <div className="arena-next" style={{ fontSize: "1em", border: "2px solid #C98A2E", padding: "8px", maxWidth: "200px", width: "100%", overflow: "hidden", minWidth: "0", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
-                <div className="arena-next-label" style={{ fontSize: "15px", color: "#C98A2E", marginBottom: "4px", fontWeight: 700 }}>➡️ PRÓXIMA</div>
-                <div className="arena-next-riders" style={{ fontSize: "30px", marginBottom: "2px", lineHeight: 1, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {duplasAtualizado.filter(d => d.bois === null)[1]?.cavaleiro1} <span className="arena-separator">&</span> {duplasAtualizado.filter(d => d.bois === null)[1]?.cavaleiro2}
+            {duplasAtualizado.filter((d) => d.bois === null).length > 1 ? (
+              <div className="arena-next arena-upcoming">
+                <div className="arena-next-label secondary">➡️ PRÓXIMA</div>
+                <div className="arena-next-riders secondary-riders">
+                  {
+                    duplasAtualizado.filter((d) => d.bois === null)[1]
+                      ?.cavaleiro1
+                  }
+                  <span className="arena-separator">&</span>
+                  {
+                    duplasAtualizado.filter((d) => d.bois === null)[1]
+                      ?.cavaleiro2
+                  }
                 </div>
-                <div className="arena-next-horses" style={{ fontSize: "25px", color: "#888", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  🐴 {duplasAtualizado.filter(d => d.bois === null)[1]?.cavalo1} · {duplasAtualizado.filter(d => d.bois === null)[1]?.cavalo2}
+                <div className="arena-next-horses">
+                  🐴{" "}
+                  {duplasAtualizado.filter((d) => d.bois === null)[1]?.cavalo1}{" "}
+                  ·{" "}
+                  {duplasAtualizado.filter((d) => d.bois === null)[1]?.cavalo2}
                 </div>
               </div>
             ) : null}
@@ -125,7 +142,9 @@ export default function ArenaScreen({ duplas, ranking, tempo }) {
         ) : (
           <div className="arena-next arena-next-complete">
             <div className="arena-next-label">✅ PROVA CONCLUÍDA</div>
-            <div style={{ marginTop: "8px", fontSize: "14px", color: "#22C55E" }}>
+            <div
+              style={{ marginTop: "8px", fontSize: "14px", color: "#22C55E" }}
+            >
               {rankingAtualizado.length} duplas finalizadas
             </div>
           </div>
@@ -171,9 +190,9 @@ export default function ArenaScreen({ duplas, ranking, tempo }) {
       </div>
 
       {/* EXIT BUTTON */}
-      <button 
-        onClick={() => window.close()} 
-        className="arena-exit-btn" 
+      <button
+        onClick={() => window.close()}
+        className="arena-exit-btn"
         title="Fechar janela do Telão"
       >
         ✕
@@ -289,13 +308,60 @@ export default function ArenaScreen({ duplas, ranking, tempo }) {
           color: #22C55E;
         }
 
-        .arena-next-riders {
-          font-size: clamp(28px, 6vw, 56px);
-          font-weight: 700;
-          color: #F0F0F0;
-          line-height: 1.1;
-          margin-bottom: 12px;
-        }
+/* Container que envolve as duas caixas */
+.arena-competitors-wrapper {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: stretch;
+  gap: 40px;
+  width: 100%;
+  max-width: 1400px;
+}
+  /* Estilo específico para a "Próxima Dupla" não ficar gigante mas caber o nome */
+.arena-upcoming {
+  flex: 0 1 400px; /* Não deixa crescer demais, mas permite espaço */
+  border-color: #C98A2E !important;
+  opacity: 0.9;
+}
+
+.secondary-riders {
+  font-size: clamp(18px, 3vw, 32px) !important;
+}
+
+/* RESPONSIVIDADE PARA TELAS MENORES */
+@media (max-width: 1024px) {
+  .arena-competitors-wrapper {
+    flex-direction: column; /* Empilha uma em cima da outra */
+    align-items: center;
+    gap: 20px;
+  }
+  
+  .arena-upcoming {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* Removemos o 'white-space: nowrap' das classes de ranking também */
+.arena-rank-name {
+  font-size: clamp(13px, 2vw, 16px);
+  font-weight: 700;
+  color: #F0F0F0;
+  /* Removido o nowrap e ellipsis para nomes grandes no ranking */
+  line-height: 1.2;
+}
+
+/* Ajuste das caixas de texto para permitir quebra de linha */
+.arena-next-riders {
+  font-size: clamp(24px, 5vw, 52px);
+  font-weight: 700;
+  color: #F0F0F0;
+  line-height: 1.2; /* Aumentado para não sobrepor linhas */
+  margin-bottom: 12px;
+  word-wrap: break-word; /* Força quebra de palavra se necessário */
+  overflow-wrap: break-word;
+}
 
         .arena-separator {
           color: #C98A2E;
