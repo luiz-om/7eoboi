@@ -34,6 +34,12 @@ function gerarRanking(duplas = []) {
     .sort((a, b) => (b.bois !== a.bois ? b.bois - a.bois : a.tempo - b.tempo));
 }
 
+function gerarListaRankingCompleta(duplas = []) {
+  const ranking = gerarRanking(duplas);
+  const sat = duplas.filter(item => item.bois === "SAT");
+  return [...ranking, ...sat];
+}
+
 function duplaConcluida(dupla) {
   return dupla?.bois !== null;
 }
@@ -411,6 +417,7 @@ export default function RanchSortingApp() {
   const cavalosPremiadosDaProva = listarCavalosPremiados(provaAtual);
   const rankingCavalosDaProva = gerarRankingCavalos(provas, { provaId: provaAtualId });
   const rankingCavalosGeral = gerarRankingCavalos(provas, { apenasFinalizadas: true });
+  const rankingCompleto = gerarListaRankingCompleta(duplas);
 
   function cadastrarDupla() {
     if (!provaAtual) {
@@ -531,7 +538,7 @@ export default function RanchSortingApp() {
   }
 
   function exportarRankingProva(prova) {
-    const rankingProva = gerarRanking(prova?.duplas || []);
+    const rankingProva = gerarListaRankingCompleta(prova?.duplas || []);
     if (!prova || rankingProva.length === 0) {
       toast("Nenhum resultado para exportar.", "erro");
       return false;
@@ -540,13 +547,13 @@ export default function RanchSortingApp() {
     const linhas = rankingProva.map((dp, index) => [
       escaparCsv(prova.nome),
       escaparCsv(formatarData(prova.data)),
-      index + 1,
+      duplaSat(dp) ? "SAT" : index + 1,
       escaparCsv(dp.cavaleiro1),
       escaparCsv(dp.cavalo1),
       escaparCsv(dp.cavaleiro2),
       escaparCsv(dp.cavalo2),
-      dp.bois,
-      Number(dp.tempo).toFixed(3),
+      duplaSat(dp) ? "SAT" : dp.bois,
+      duplaSat(dp) ? "" : Number(dp.tempo).toFixed(3),
     ].join(";"));
     const csv = `\uFEFF${[cabecalho, ...linhas].join("\n")}`;
     baixarArquivo(new Blob([csv], { type: "text/csv;charset=utf-8;" }), gerarNomeArquivoResultados(prova));
@@ -560,11 +567,14 @@ export default function RanchSortingApp() {
   function gerarTextoWhatsApp() {
     if (!provaAtual) return "";
     const dataHora = new Date().toLocaleString("pt-BR");
-    const linhasRanking = ranking.map((dp, index) => {
-      const prefixo = medalhas[index] || `${index + 1}.`;
-      return duplaSat(dp)
-        ? `${prefixo} ${dp.cavaleiro1} & ${dp.cavaleiro2} - SAT`
-        : `${prefixo} ${dp.cavaleiro1} & ${dp.cavaleiro2} - ${dp.bois} bois em ${Number(dp.tempo).toFixed(3)}s`;
+    let posicaoValida = 0;
+    const linhasRanking = rankingCompleto.map((dp) => {
+      if (duplaSat(dp)) {
+        return `SAT ${dp.cavaleiro1} & ${dp.cavaleiro2} - SAT`;
+      }
+      const prefixo = medalhas[posicaoValida] || `${posicaoValida + 1}.`;
+      posicaoValida += 1;
+      return `${prefixo} ${dp.cavaleiro1} & ${dp.cavaleiro2} - ${dp.bois} bois em ${Number(dp.tempo).toFixed(3)}s`;
     });
     return [
       `*${provaAtual.nome}*`,
@@ -898,20 +908,20 @@ export default function RanchSortingApp() {
                       <div style={{ fontSize: "18px", color: "#C98A2E", fontWeight: 700 }}>{pendentes}</div>
                     </div>
                   </div>
-                  {finalizada && rankingProva.length > 0 ? (
+                  {finalizada && gerarListaRankingCompleta(prova.duplas || []).length > 0 ? (
                     <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #2A2A2A" }}>
                       <div style={{ fontSize: "10px", color: "#666", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>Historico de Resultados</div>
-                      {rankingProva.slice(0, 5).map((dp, index) => (
+                      {gerarListaRankingCompleta(prova.duplas || []).slice(0, 5).map((dp, index) => (
                         <div key={dp.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "8px 10px", background: "#181818", borderRadius: "8px", marginBottom: "6px" }}>
                           <div style={{ minWidth: 0, flex: 1 }}>
                             <div style={{ fontSize: "13px", color: "#EAEAEA", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {(medalhas[index] || `${index + 1}.`)} {dp.cavaleiro1} & {dp.cavaleiro2}
+                              {duplaSat(dp) ? "SAT" : (medalhas[index] || `${index + 1}.`)} {dp.cavaleiro1} & {dp.cavaleiro2}
                             </div>
                             <div style={{ fontSize: "10px", color: "#555", marginTop: "2px" }}>🐴 {dp.cavalo1} · {dp.cavalo2}</div>
                           </div>
                           <div style={{ textAlign: "right", flexShrink: 0 }}>
-                            <div style={{ fontSize: "12px", color: duplaSat(dp) ? "#F4C542" : "#22C55E", fontWeight: 700 }}>{formatarBois(dp)}</div>
-                            <div style={{ fontSize: "10px", color: "#666" }}>{fmt(dp.tempo)}</div>
+                            <div style={{ fontSize: "12px", color: duplaSat(dp) ? "#F4C542" : "#22C55E", fontWeight: 700 }}>{duplaSat(dp) ? "SAT" : formatarBois(dp)}</div>
+                            <div style={{ fontSize: "10px", color: "#666" }}>{duplaSat(dp) ? "" : fmt(dp.tempo)}</div>
                           </div>
                         </div>
                       ))}
@@ -1099,7 +1109,7 @@ export default function RanchSortingApp() {
               </div>
             ) : null}
 
-            {ranking.length === 0 ? <EmptyState title="Nenhum resultado registrado" text="Os resultados desta prova aparecerao aqui." /> : ranking.map((dp, i) => {
+            {rankingCompleto.length === 0 ? <EmptyState title="Nenhum resultado registrado" text="Os resultados desta prova aparecerao aqui." /> : rankingCompleto.map((dp, i) => {
               const pod = i < 3;
               const podCores = [
                 { bg: "#141000", border: "#F4C54244", num: "#F4C542" },
@@ -1109,14 +1119,14 @@ export default function RanchSortingApp() {
               const c = pod ? podCores[i] : { bg: "#1E1E1E", border: "#2A2A2A", num: "#555" };
               return (
                 <div key={dp.id} style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: "10px", padding: "14px 16px", marginBottom: "8px", display: "flex", alignItems: "center", gap: "14px" }}>
-                  <div style={{ width: "40px", height: "40px", borderRadius: "8px", border: `2px solid ${c.num}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: pod ? "22px" : "14px", fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: c.num, flexShrink: 0 }}>{pod ? medalhas[i] : i + 1}</div>
+                  <div style={{ width: "40px", height: "40px", borderRadius: "8px", border: `2px solid ${duplaSat(dp) ? "#F4C542" : c.num}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: pod ? "22px" : "14px", fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: duplaSat(dp) ? "#F4C542" : c.num, flexShrink: 0 }}>{duplaSat(dp) ? "SAT" : (pod ? medalhas[i] : i + 1)}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: "15px", fontWeight: 700, color: pod ? "#F0F0F0" : "#888", fontFamily: "'Oswald',sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{dp.cavaleiro1} & {dp.cavaleiro2}</div>
                     <div style={{ fontSize: "11px", color: "#444", marginTop: "2px" }}>🐴 {dp.cavalo1} · {dp.cavalo2}</div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontSize: "22px", fontWeight: 800, color: duplaSat(dp) ? "#F4C542" : "#22C55E", fontFamily: "'Oswald',sans-serif" }}>{formatarBois(dp)}</div>
-                    <div style={{ fontSize: "12px", color: "#555" }}>⏱️ {fmt(dp.tempo)}</div>
+                    <div style={{ fontSize: "22px", fontWeight: 800, color: duplaSat(dp) ? "#F4C542" : "#22C55E", fontFamily: "'Oswald',sans-serif" }}>{duplaSat(dp) ? "SAT" : formatarBois(dp)}</div>
+                    <div style={{ fontSize: "12px", color: "#555" }}>{duplaSat(dp) ? "" : `⏱️ ${fmt(dp.tempo)}`}</div>
                   </div>
                 </div>
               );
