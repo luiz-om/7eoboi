@@ -534,30 +534,35 @@ export default function RanchSortingApp() {
     }
   }
 
-  async function iniciarNovaProva() {
+  async function finalizarProva(id) {
     try {
-      if (provaAtual && !provaAtual.finalizada) {
-        await updateProva(provaAtual.id, {
-          nome: provaAtual.nome,
-          local: provaAtual.local,
-          data: provaAtual.data,
-          observacoes: provaAtual.observacoes,
+      const prova = provas.find((item) => item.id === id);
+      if (!prova) return;
+      if (prova.finalizada) {
+        toast("Essa prova ja foi finalizada.", "erro");
+        return;
+      }
+      if (!confirm(`Finalizar a prova "${prova.nome}"?`)) return;
+
+      await updateProva(prova.id, {
+          nome: prova.nome,
+          local: prova.local,
+          data: prova.data,
+          observacoes: prova.observacoes,
           finalizada: true,
           finalizadaEm: new Date().toISOString(),
-        });
-      }
+      });
 
       resetarFormProva();
       setForm({ cavaleiro1: "", cavalo1: "", cavaleiro2: "", cavalo2: "" });
       setResultadoForm({ duplaId: "", bois: "", tempo: "" });
       setEditandoId(null);
       setEditandoResultadoId(null);
-      setProvaAtualId("");
       setAba("provas");
-      await carregarDados(null);
-      toast("Preencha os dados para cadastrar a nova prova.");
+      await carregarDados(provaAtualId === prova.id ? null : provaAtualId);
+      toast(`Prova "${prova.nome}" finalizada.`);
     } catch (error) {
-      toast(error.message || "Nao foi possivel iniciar uma nova prova.", "erro");
+      toast(error.message || "Nao foi possivel finalizar a prova.", "erro");
     }
   }
 
@@ -948,6 +953,11 @@ export default function RanchSortingApp() {
                     </div>
                     <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
                       <Btn variant="secondary" size="sm" onClick={e => { e.stopPropagation(); editarProva(prova); }}>✏️</Btn>
+                      {!finalizada ? (
+                        <Btn variant="amber" size="sm" onClick={e => { e.stopPropagation(); finalizarProva(prova.id); }}>
+                          🏁
+                        </Btn>
+                      ) : null}
                       <Btn variant="danger" size="sm" onClick={e => { e.stopPropagation(); removerProva(prova.id); }}>🗑️</Btn>
                     </div>
                   </div>
@@ -1052,11 +1062,6 @@ export default function RanchSortingApp() {
               </div>
             ))}
 
-            {duplas.length > 0 ? (
-              <Btn variant="danger" size="lg" full onClick={iniciarNovaProva} style={{ marginTop: "16px" }}>
-                🔄 Iniciar Nova Prova
-              </Btn>
-            ) : null}
           </div>
         )}
 
@@ -1207,7 +1212,7 @@ export default function RanchSortingApp() {
 
             {!provaFinalizada ? (
               <div style={{ background: "#1A1400", border: "1px solid #F4C54233", borderRadius: "12px", padding: "16px", marginBottom: "16px", color: "#D8C27A", textAlign: "center" }}>
-                Finalize a prova em <strong>Iniciar Nova Prova</strong> para liberar os certificados oficiais dos cavalos ganhadores.
+                Finalize a prova na aba <strong>Provas</strong> para liberar os certificados oficiais dos cavalos ganhadores.
               </div>
             ) : null}
 
