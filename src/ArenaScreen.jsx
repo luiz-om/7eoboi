@@ -18,11 +18,11 @@ export default function ArenaScreen({
     return () => clearTimeout(timer);
   }, [ranking]);
 
-  const proximaDupla = duplas.find((d) => d.bois === null);
+  const proximaDupla = duplas.find((d) => d.status === "PENDENTE");
   const top5 = ranking.slice(0, 5);
   const top3 = ranking.slice(0, 3);
   const medalhas = ["🥇", "🥈", "🥉"];
-  const temPendentes = duplas.some((d) => d.bois === null);
+  const temPendentes = duplas.some((d) => d.status === "PENDENTE");
   const semDuplasCadastradas = duplas.length === 0;
   const provaEncerrada = provaFinalizada || !temPendentes;
 
@@ -55,16 +55,16 @@ export default function ArenaScreen({
               </div>
             </div>
 
-            {duplas.filter((d) => d.bois === null).length > 1 ? (
+            {duplas.filter((d) => d.status === "PENDENTE").length > 1 ? (
               <div className="arena-next arena-upcoming">
                 <div className="arena-next-label secondary">➡️ PRÓXIMA</div>
                 <div className="arena-next-riders secondary-riders">
-                  {duplas.filter((d) => d.bois === null)[1]?.cavaleiro1}
+                  {duplas.filter((d) => d.status === "PENDENTE")[1]?.cavaleiro1}
                   <span className="arena-separator">&</span>
-                  {duplas.filter((d) => d.bois === null)[1]?.cavaleiro2}
+                  {duplas.filter((d) => d.status === "PENDENTE")[1]?.cavaleiro2}
                 </div>
                 <div className="arena-next-horses">
-                  🐴 {duplas.filter((d) => d.bois === null)[1]?.cavalo1} · {duplas.filter((d) => d.bois === null)[1]?.cavalo2}
+                  🐴 {duplas.filter((d) => d.status === "PENDENTE")[1]?.cavalo1} · {duplas.filter((d) => d.status === "PENDENTE")[1]?.cavalo2}
                 </div>
               </div>
             ) : null}

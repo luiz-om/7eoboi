@@ -11,22 +11,22 @@ export function formatarData(valor) {
 
 export function gerarRanking(duplas = []) {
   return [...duplas]
-    .filter((item) => item.bois !== null && item.bois !== "SAT")
+    .filter((item) => item.status === "VALIDO")
     .sort((a, b) => (b.bois !== a.bois ? b.bois - a.bois : a.tempo - b.tempo));
 }
 
 export function gerarListaRankingCompleta(duplas = []) {
   const ranking = gerarRanking(duplas);
-  const sat = duplas.filter((item) => item.bois === "SAT");
+  const sat = duplas.filter((item) => item.status === "SAT");
   return [...ranking, ...sat];
 }
 
 export function duplaConcluida(dupla) {
-  return dupla?.bois !== null;
+  return dupla?.status === "VALIDO" || dupla?.status === "SAT";
 }
 
 export function duplaSat(dupla) {
-  return dupla?.bois === "SAT";
+  return dupla?.status === "SAT";
 }
 
 export function formatarBois(dupla) {
