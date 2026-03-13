@@ -1,24 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ArenaScreen from "./ArenaScreen";
-
-function gerarId() { return Math.random().toString(36).substr(2, 9); }
+import {
+  createDupla,
+  createProva,
+  deleteDupla,
+  deleteProva,
+  ensureSignedIn,
+  listProvasComDuplas,
+  updateDupla,
+  updateProva,
+  updateResultadoDupla,
+} from "./lib/ranchSortingApi";
+import { supabase } from "./lib/supabase";
 
 function escaparCsv(valor) {
   return `"${String(valor).replace(/"/g, '""')}"`;
-}
-
-function criarProvaBase(dados = {}) {
-  return {
-    id: dados.id || gerarId(),
-    nome: dados.nome || "",
-    local: dados.local || "",
-    data: dados.data || new Date().toISOString().slice(0, 10),
-    observacoes: dados.observacoes || "",
-    criadaEm: dados.criadaEm || new Date().toISOString(),
-    finalizada: Boolean(dados.finalizada),
-    finalizadaEm: dados.finalizadaEm || null,
-    duplas: Array.isArray(dados.duplas) ? dados.duplas : [],
-  };
 }
 
 function formatarData(valor) {
@@ -57,6 +53,8 @@ const PREMIACAO_CAVALOS = [
   { colocacao: 2, titulo: "Vice-campeao", medalha: "🥈", pontos: 3, cor: "#C0C0C0" },
   { colocacao: 3, titulo: "3º Lugar", medalha: "🥉", pontos: 1, cor: "#CD7F32" },
 ];
+
+const LIVE_CHANNEL_NAME = "ranch-sorting-live";
 
 function listarCavalosPremiados(prova) {
   if (!prova) return [];
@@ -247,14 +245,19 @@ function EmptyState({ title, text, icon = "🐄" }) {
 export default function RanchSortingApp() {
   usePWA();
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const isTelaoWindow = urlParams.get("telao") === "true";
+  const provaIdTelao = urlParams.get("prova") || "";
+
   const [aba, setAba] = useState("provas");
   const [provas, setProvas] = useState([]);
-  const [provaAtualId, setProvaAtualId] = useState("");
+  const [provaAtualId, setProvaAtualId] = useState(provaIdTelao);
   const [carregando, setCarregando] = useState(true);
   const [form, setForm] = useState({ cavaleiro1: "", cavalo1: "", cavaleiro2: "", cavalo2: "" });
   const [resultadoForm, setResultadoForm] = useState({ duplaId: "", bois: "", tempo: "" });
   const [provaForm, setProvaForm] = useState({ nome: "", local: "", data: new Date().toISOString().slice(0, 10), observacoes: "" });
   const [mensagem, setMensagem] = useState(null);
+  const [erroConexao, setErroConexao] = useState("");
   const [editandoId, setEditandoId] = useState(null);
   const [editandoResultadoId, setEditandoResultadoId] = useState(null);
   const [editandoProvaId, setEditandoProvaId] = useState(null);
@@ -262,48 +265,10 @@ export default function RanchSortingApp() {
   const [timerRodando, setTimerRodando] = useState(false);
   const [tempoInicial, setTempoInicial] = useState(null);
   const [boisTelao, setBoisTelao] = useState("");
+  const canalTelaoRef = useRef(null);
 
   useEffect(() => {
-    try {
-      const provasSalvas = localStorage.getItem("provas");
-      const provaAtualSalva = localStorage.getItem("provaAtualId");
-
-      if (provasSalvas) {
-        const lista = JSON.parse(provasSalvas);
-        setProvas(Array.isArray(lista) ? lista.map(criarProvaBase) : []);
-        if (provaAtualSalva) setProvaAtualId(provaAtualSalva);
-      } else {
-        const legado = localStorage.getItem("duplas");
-        const duplasLegado = legado ? JSON.parse(legado) : [];
-        if (Array.isArray(duplasLegado) && duplasLegado.length > 0) {
-          const provaMigrada = criarProvaBase({
-            nome: "Prova importada",
-            observacoes: "Migrada automaticamente do formato antigo.",
-            duplas: duplasLegado,
-          });
-          setProvas([provaMigrada]);
-          setProvaAtualId(provaMigrada.id);
-        }
-      }
-    } catch {}
-
-    try { const t = localStorage.getItem("tempoTelao"); if (t) setTempoTelao(t); } catch {}
-    try { const r = localStorage.getItem("timerRodando"); if (r) setTimerRodando(r === "true"); } catch {}
-    setCarregando(false);
-  }, []);
-
-  useEffect(() => {
-    if (carregando) return;
-    try { localStorage.setItem("provas", JSON.stringify(provas)); } catch {}
-  }, [provas, carregando]);
-
-  useEffect(() => {
-    if (carregando) return;
-    try { localStorage.setItem("provaAtualId", provaAtualId); } catch {}
-  }, [provaAtualId, carregando]);
-
-  useEffect(() => {
-    if (!timerRodando) {
+    if (isTelaoWindow || !timerRodando) {
       setTempoInicial(null);
       return;
     }
@@ -317,22 +282,11 @@ export default function RanchSortingApp() {
         const totalMilisegundos = Math.floor(tempoDecorrido);
         const segundos = Math.floor(totalMilisegundos / 1000);
         const milisegundos = totalMilisegundos % 1000;
-        const novoTempo = `${String(segundos).padStart(2, "0")}.${String(milisegundos).padStart(3, "0")}`;
-        try { localStorage.setItem("tempoTelao", novoTempo); } catch {}
-        return novoTempo;
+        return `${String(segundos).padStart(2, "0")}.${String(milisegundos).padStart(3, "0")}`;
       });
     }, 10);
     return () => clearInterval(interval);
-  }, [timerRodando, tempoInicial]);
-
-  useEffect(() => {
-    if (timerRodando) return;
-    try { localStorage.setItem("tempoTelao", tempoTelao); } catch {}
-  }, [tempoTelao, timerRodando]);
-
-  useEffect(() => {
-    try { localStorage.setItem("timerRodando", timerRodando); } catch {}
-  }, [timerRodando]);
+  }, [isTelaoWindow, timerRodando, tempoInicial]);
 
   useEffect(() => {
     if (!provas.length) {
@@ -346,26 +300,126 @@ export default function RanchSortingApp() {
 
   function toast(msg, tipo = "ok") { setMensagem({ texto: msg, tipo }); setTimeout(() => setMensagem(null), 3000); }
 
+  async function carregarDados(preferidoId = null) {
+    const lista = await listProvasComDuplas();
+    setProvas(lista);
+    setProvaAtualId((atual) => {
+      if (isTelaoWindow && provaIdTelao) return provaIdTelao;
+      const alvo = preferidoId || atual;
+      if (alvo && lista.some((prova) => prova.id === alvo)) return alvo;
+      return lista[0]?.id || "";
+    });
+  }
+
+  useEffect(() => {
+    let ativo = true;
+    let timeoutId = null;
+
+    const withTimeout = (promise, ms = 12000) =>
+      Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          timeoutId = window.setTimeout(() => {
+            reject(new Error("Tempo excedido ao conectar com o Supabase."));
+          }, ms);
+        }),
+      ]);
+
+    const iniciar = async () => {
+      try {
+        setCarregando(true);
+        setErroConexao("");
+        await withTimeout(ensureSignedIn());
+        if (!ativo) return;
+        window.clearTimeout(timeoutId);
+        await withTimeout(carregarDados(isTelaoWindow ? provaIdTelao : null));
+      } catch (error) {
+        if (!ativo) return;
+        const msg = error?.message || "Nao foi possivel conectar ao Supabase.";
+        setErroConexao(msg);
+        toast(msg, "erro");
+      } finally {
+        if (timeoutId) window.clearTimeout(timeoutId);
+        if (ativo) setCarregando(false);
+      }
+    };
+
+    iniciar();
+
+    const channel = supabase
+      .channel(`db-changes-${isTelaoWindow ? "telao" : "app"}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "provas" }, () => {
+        carregarDados(isTelaoWindow ? provaIdTelao : null).catch(() => {});
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "duplas" }, () => {
+        carregarDados(isTelaoWindow ? provaIdTelao : null).catch(() => {});
+      })
+      .subscribe();
+
+    return () => {
+      ativo = false;
+      if (timeoutId) window.clearTimeout(timeoutId);
+      supabase.removeChannel(channel);
+    };
+  }, [isTelaoWindow, provaIdTelao]);
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return undefined;
+
+    const canal = new BroadcastChannel(LIVE_CHANNEL_NAME);
+    canalTelaoRef.current = canal;
+
+    canal.onmessage = (event) => {
+      if (event.data?.type !== "timer-sync") return;
+      if (typeof event.data.tempo === "string") setTempoTelao(event.data.tempo);
+      if (typeof event.data.timerRodando === "boolean") setTimerRodando(event.data.timerRodando);
+    };
+
+    return () => {
+      canal.close();
+      canalTelaoRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isTelaoWindow || !canalTelaoRef.current) return;
+    canalTelaoRef.current.postMessage({
+      type: "timer-sync",
+      tempo: tempoTelao,
+      timerRodando,
+    });
+  }, [isTelaoWindow, tempoTelao, timerRodando]);
+
   function resetarFormProva() {
     setProvaForm({ nome: "", local: "", data: new Date().toISOString().slice(0, 10), observacoes: "" });
     setEditandoProvaId(null);
   }
 
-  function salvarProva() {
+  async function salvarProva() {
     if (!provaForm.nome.trim()) {
       toast("Informe o nome da prova.", "erro");
       return;
     }
-    if (editandoProvaId) {
-      setProvas(lista => lista.map(prova => prova.id === editandoProvaId ? { ...prova, ...provaForm } : prova));
-      toast("Prova atualizada!");
-    } else {
-      const novaProva = criarProvaBase({ ...provaForm, duplas: [] });
-      setProvas(lista => [novaProva, ...lista]);
-      setProvaAtualId(novaProva.id);
-      toast("Prova cadastrada!");
+    try {
+      if (editandoProvaId) {
+        const provaExistente = provas.find((prova) => prova.id === editandoProvaId);
+        await updateProva(editandoProvaId, {
+          ...provaForm,
+          finalizada: Boolean(provaExistente?.finalizada),
+          finalizadaEm: provaExistente?.finalizadaEm || null,
+        });
+        await carregarDados(editandoProvaId);
+        toast("Prova atualizada!");
+      } else {
+        const novaProva = await createProva(provaForm);
+        await carregarDados(novaProva.id);
+        setProvaAtualId(novaProva.id);
+        toast("Prova cadastrada!");
+      }
+      resetarFormProva();
+    } catch (error) {
+      toast(error.message || "Nao foi possivel salvar a prova.", "erro");
     }
-    resetarFormProva();
   }
 
   function editarProva(prova) {
@@ -387,22 +441,18 @@ export default function RanchSortingApp() {
     setForm({ cavaleiro1: "", cavalo1: "", cavaleiro2: "", cavalo2: "" });
   }
 
-  function removerProva(id) {
+  async function removerProva(id) {
     const prova = provas.find(item => item.id === id);
     if (!prova) return;
     if (!confirm(`Remover a prova "${prova.nome}"?`)) return;
-    const lista = provas.filter(item => item.id !== id);
-    setProvas(lista);
-    if (provaAtualId === id) {
-      setProvaAtualId(lista[0]?.id || "");
-      setAba("provas");
+    try {
+      await deleteProva(id);
+      if (provaAtualId === id) setAba("provas");
+      await carregarDados(provaAtualId === id ? null : provaAtualId);
+      toast("Prova removida!");
+    } catch (error) {
+      toast(error.message || "Nao foi possivel remover a prova.", "erro");
     }
-    toast("Prova removida!");
-  }
-
-  function atualizarProvaAtual(transformador) {
-    if (!provaAtualId) return;
-    setProvas(lista => lista.map(prova => prova.id === provaAtualId ? transformador(prova) : prova));
   }
 
   const provaAtual = provas.find(prova => prova.id === provaAtualId) || null;
@@ -419,7 +469,7 @@ export default function RanchSortingApp() {
   const rankingCavalosGeral = gerarRankingCavalos(provas, { apenasFinalizadas: true });
   const rankingCompleto = gerarListaRankingCompleta(duplas);
 
-  function cadastrarDupla() {
+  async function cadastrarDupla() {
     if (!provaAtual) {
       toast("Cadastre ou selecione uma prova primeiro.", "erro");
       setAba("provas");
@@ -427,31 +477,61 @@ export default function RanchSortingApp() {
     }
     const { cavaleiro1, cavalo1, cavaleiro2, cavalo2 } = form;
     if (!cavaleiro1 || !cavalo1 || !cavaleiro2 || !cavalo2) { toast("Preencha todos os campos!", "erro"); return; }
-    if (editandoId) {
-      atualizarProvaAtual(prova => ({ ...prova, duplas: prova.duplas.map(dp => dp.id === editandoId ? { ...dp, cavaleiro1, cavalo1, cavaleiro2, cavalo2 } : dp) }));
-      setEditandoId(null);
-      toast("Dupla atualizada!");
-    } else {
-      atualizarProvaAtual(prova => ({ ...prova, duplas: [...prova.duplas, { id: gerarId(), cavaleiro1, cavalo1, cavaleiro2, cavalo2, bois: null, tempo: null }] }));
-      toast("Dupla cadastrada!");
+    try {
+      if (editandoId) {
+        const duplaAtual = duplas.find((dp) => dp.id === editandoId);
+        await updateDupla(editandoId, {
+          cavaleiro1,
+          cavalo1,
+          cavaleiro2,
+          cavalo2,
+          bois: duplaAtual?.bois ?? null,
+          tempo: duplaAtual?.tempo ?? null,
+        });
+        setEditandoId(null);
+        toast("Dupla atualizada!");
+      } else {
+        const ordem = duplas.reduce((max, dp) => Math.max(max, dp.ordem || 0), 0) + 1;
+        await createDupla({
+          provaId: provaAtual.id,
+          ordem,
+          cavaleiro1,
+          cavalo1,
+          cavaleiro2,
+          cavalo2,
+          bois: null,
+          tempo: null,
+        });
+        toast("Dupla cadastrada!");
+      }
+      setForm({ cavaleiro1: "", cavalo1: "", cavaleiro2: "", cavalo2: "" });
+      await carregarDados(provaAtual.id);
+    } catch (error) {
+      toast(error.message || "Nao foi possivel salvar a dupla.", "erro");
     }
-    setForm({ cavaleiro1: "", cavalo1: "", cavaleiro2: "", cavalo2: "" });
   }
 
   function editarDupla(dp) { setForm({ cavaleiro1: dp.cavaleiro1, cavalo1: dp.cavalo1, cavaleiro2: dp.cavaleiro2, cavalo2: dp.cavalo2 }); setEditandoId(dp.id); setAba("cadastro"); }
   function cancelarEdicao() { setEditandoId(null); setForm({ cavaleiro1: "", cavalo1: "", cavaleiro2: "", cavalo2: "" }); }
 
-  function removerDupla(id) {
+  async function removerDupla(id) {
     if (provaFinalizada) {
       toast("Prova finalizada. Nao e permitido alterar duplas.", "erro");
       return;
     }
     if (!confirm("Remover esta dupla?")) return;
-    atualizarProvaAtual(prova => ({ ...prova, duplas: prova.duplas.filter(dp => dp.id !== id) }));
-    toast("Dupla removida!");
+    try {
+      await deleteDupla(id);
+      if (editandoId === id) cancelarEdicao();
+      if (editandoResultadoId === id) cancelarEdicaoResultado();
+      await carregarDados(provaAtual?.id || null);
+      toast("Dupla removida!");
+    } catch (error) {
+      toast(error.message || "Nao foi possivel remover a dupla.", "erro");
+    }
   }
 
-  function salvarResultado() {
+  async function salvarResultado() {
     if (!provaAtual) {
       toast("Cadastre ou selecione uma prova primeiro.", "erro");
       setAba("provas");
@@ -469,10 +549,15 @@ export default function RanchSortingApp() {
     if (isNaN(b) || b < 0 || b > 10) { toast("Bois válidos: 0 a 10", "erro"); return; }
     if (isNaN(t) || t <= 0) { toast("Tempo inválido!", "erro"); return; }
     const era = !!editandoResultadoId;
-    atualizarProvaAtual(prova => ({ ...prova, duplas: prova.duplas.map(dp => dp.id === duplaId ? { ...dp, bois: b, tempo: t } : dp) }));
-    setResultadoForm({ duplaId: "", bois: "", tempo: "" });
-    setEditandoResultadoId(null);
-    toast(era ? "Resultado atualizado!" : "Resultado registrado!");
+    try {
+      await updateResultadoDupla(duplaId, { bois: b, tempo: t });
+      setResultadoForm({ duplaId: "", bois: "", tempo: "" });
+      setEditandoResultadoId(null);
+      await carregarDados(provaAtual.id);
+      toast(era ? "Resultado atualizado!" : "Resultado registrado!");
+    } catch (error) {
+      toast(error.message || "Nao foi possivel salvar o resultado.", "erro");
+    }
   }
 
   function iniciarEdicaoResultado(dp) {
@@ -484,18 +569,23 @@ export default function RanchSortingApp() {
     });
   }
   function cancelarEdicaoResultado() { setEditandoResultadoId(null); setResultadoForm({ duplaId: "", bois: "", tempo: "" }); }
-  function limparResultado(id) {
+  async function limparResultado(id) {
     if (provaFinalizada) {
       toast("Prova finalizada. Nao e permitido alterar resultados.", "erro");
       return;
     }
     if (!confirm("Remover resultado?")) return;
-    atualizarProvaAtual(prova => ({ ...prova, duplas: prova.duplas.map(dp => dp.id === id ? { ...dp, bois: null, tempo: null } : dp) }));
-    if (editandoResultadoId === id) cancelarEdicaoResultado();
-    toast("Resultado removido!");
+    try {
+      await updateResultadoDupla(id, { bois: null, tempo: null });
+      if (editandoResultadoId === id) cancelarEdicaoResultado();
+      await carregarDados(provaAtual?.id || null);
+      toast("Resultado removido!");
+    } catch (error) {
+      toast(error.message || "Nao foi possivel limpar o resultado.", "erro");
+    }
   }
 
-  function registrarSAT() {
+  async function registrarSAT() {
     if (!provaAtual) {
       toast("Cadastre ou selecione uma prova primeiro.", "erro");
       setAba("provas");
@@ -508,14 +598,64 @@ export default function RanchSortingApp() {
     }
     const [segundos, milisegundos] = tempoTelao.split(".").map(Number);
     const tempoEmSegundos = (segundos || 0) + (((milisegundos || 0)) / 1000);
-    atualizarProvaAtual(prova => ({
-      ...prova,
-      duplas: prova.duplas.map(d => d.id === atual.id ? { ...d, tempo: tempoEmSegundos, bois: "SAT" } : d),
-    }));
-    toast(`Dupla marcada como SAT: ${atual.cavaleiro1}`);
-    setTempoTelao("00.000");
-    setBoisTelao("");
-    setTimerRodando(false);
+    try {
+      await updateResultadoDupla(atual.id, { bois: "SAT", tempo: tempoEmSegundos });
+      await carregarDados(provaAtual.id);
+      toast(`Dupla marcada como SAT: ${atual.cavaleiro1}`);
+      setTempoTelao("00.000");
+      setBoisTelao("");
+      setTimerRodando(false);
+    } catch (error) {
+      toast(error.message || "Nao foi possivel marcar SAT.", "erro");
+    }
+  }
+
+  async function finalizarDuplaAtual() {
+    const atual = duplas.find(d => !duplaConcluida(d));
+    if (!atual) { toast("Nenhuma dupla pendente!", "erro"); return; }
+    if (boisTelao === "") { toast("Digite o número de bois!", "erro"); return; }
+    const bois = parseInt(boisTelao);
+    if (isNaN(bois) || bois < 0 || bois > 10) { toast("Bois devem ser entre 0 e 10!", "erro"); return; }
+    const [segundos, milisegundos] = tempoTelao.split(".").map(Number);
+    const tempoEmSegundos = (segundos || 0) + ((milisegundos || 0) / 1000);
+
+    try {
+      await updateResultadoDupla(atual.id, { bois, tempo: tempoEmSegundos });
+      await carregarDados(provaAtual?.id || null);
+      toast(`Dupla finalizada: ${atual.cavaleiro1} - ${bois} bois`);
+      setTempoTelao("00.000");
+      setBoisTelao("");
+      setTimerRodando(false);
+    } catch (error) {
+      toast(error.message || "Nao foi possivel finalizar a dupla.", "erro");
+    }
+  }
+
+  async function iniciarNovaProva() {
+    try {
+      if (provaAtual && !provaAtual.finalizada) {
+        await updateProva(provaAtual.id, {
+          nome: provaAtual.nome,
+          local: provaAtual.local,
+          data: provaAtual.data,
+          observacoes: provaAtual.observacoes,
+          finalizada: true,
+          finalizadaEm: new Date().toISOString(),
+        });
+      }
+
+      resetarFormProva();
+      setForm({ cavaleiro1: "", cavalo1: "", cavaleiro2: "", cavalo2: "" });
+      setResultadoForm({ duplaId: "", bois: "", tempo: "" });
+      setEditandoId(null);
+      setEditandoResultadoId(null);
+      setProvaAtualId("");
+      setAba("provas");
+      await carregarDados(null);
+      toast("Preencha os dados para cadastrar a nova prova.");
+    } catch (error) {
+      toast(error.message || "Nao foi possivel iniciar uma nova prova.", "erro");
+    }
   }
 
   function gerarNomeArquivoResultados(prova = provaAtual) {
@@ -715,24 +855,6 @@ export default function RanchSortingApp() {
 
   const tempoBlur = e => setResultadoForm(p => ({ ...p, tempo: e.target.value.replace(",", ".") }));
 
-  function iniciarNovaProva() {
-    if (provaAtual && !provaAtual.finalizada) {
-      atualizarProvaAtual(prova => ({
-        ...prova,
-        finalizada: true,
-        finalizadaEm: new Date().toISOString(),
-      }));
-    }
-    resetarFormProva();
-    setForm({ cavaleiro1: "", cavalo1: "", cavaleiro2: "", cavalo2: "" });
-    setResultadoForm({ duplaId: "", bois: "", tempo: "" });
-    setEditandoId(null);
-    setEditandoResultadoId(null);
-    setProvaAtualId("");
-    setAba("provas");
-    toast("Preencha os dados para cadastrar a nova prova.");
-  }
-
   const abrirTelao = () => {
     const params = new URLSearchParams();
     params.set("telao", "true");
@@ -740,13 +862,6 @@ export default function RanchSortingApp() {
     const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
     window.open(url, "telao", "width=1920,height=1080,fullscreen=yes");
   };
-
-  const urlParams = new URLSearchParams(window.location.search);
-  const isTelaoWindow = urlParams.get("telao") === "true";
-
-  if (isTelaoWindow) {
-    return <ArenaScreen duplas={duplas} ranking={ranking} tempo={tempoTelao} provaFinalizada={provaFinalizada} />;
-  }
 
   if (carregando) {
     return (
@@ -756,6 +871,20 @@ export default function RanchSortingApp() {
         <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
       </div>
     );
+  }
+
+  if (erroConexao) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#121212", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+        <div style={{ width: "100%", maxWidth: "520px" }}>
+          <EmptyState title="Falha na conexao com o Supabase" text={erroConexao} icon="⚠️" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isTelaoWindow) {
+    return <ArenaScreen duplas={duplas} ranking={ranking} tempo={tempoTelao} nomeProva={provaAtual?.nome || "Ranch Sorting"} provaFinalizada={provaFinalizada} />;
   }
 
   const tabs = [
@@ -1305,20 +1434,7 @@ export default function RanchSortingApp() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
                 <Btn variant="success" size="lg" full onClick={abrirTelao} style={{ fontSize: "14px" }}>🪟 Abrir Telão</Btn>
-                <Btn variant="amber" size="lg" full onClick={() => {
-                  const atual = duplas.find(d => !duplaConcluida(d));
-                  if (!atual) { toast("Nenhuma dupla pendente!", "erro"); return; }
-                  if (boisTelao === "") { toast("Digite o número de bois!", "erro"); return; }
-                  const bois = parseInt(boisTelao);
-                  if (isNaN(bois) || bois < 0 || bois > 10) { toast("Bois devem ser entre 0 e 10!", "erro"); return; }
-                  const [segundos, milisegundos] = tempoTelao.split(".").map(Number);
-                  const tempoEmSegundos = segundos + ((milisegundos || 0) / 1000);
-                  atualizarProvaAtual(prova => ({ ...prova, duplas: prova.duplas.map(d => d.id === atual.id ? { ...d, tempo: tempoEmSegundos, bois } : d) }));
-                  toast(`Dupla finalizada: ${atual.cavaleiro1} - ${bois} bois`);
-                  setTempoTelao("00.000");
-                  setBoisTelao("");
-                  setTimerRodando(false);
-                }} style={{ fontSize: "14px" }}>✅ Finalizar Dupla</Btn>
+                <Btn variant="amber" size="lg" full onClick={finalizarDuplaAtual} style={{ fontSize: "14px" }}>✅ Finalizar Dupla</Btn>
                 <Btn variant="danger" size="lg" full onClick={registrarSAT} style={{ fontSize: "14px" }}>SAT</Btn>
               </div>
             </div>
