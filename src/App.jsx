@@ -388,6 +388,7 @@ export default function RanchSortingApp() {
           cavalo1,
           cavaleiro2,
           cavalo2,
+          status: duplaAtual?.status ?? "PENDENTE",
           bois: duplaAtual?.bois ?? null,
           tempo: duplaAtual?.tempo ?? null,
         });
@@ -402,6 +403,7 @@ export default function RanchSortingApp() {
           cavalo1,
           cavaleiro2,
           cavalo2,
+          status: "PENDENTE",
           bois: null,
           tempo: null,
         });
@@ -453,7 +455,7 @@ export default function RanchSortingApp() {
     if (isNaN(t) || t <= 0) { toast("Tempo inválido!", "erro"); return; }
     const era = !!editandoResultadoId;
     try {
-      await updateResultadoDupla(duplaId, { bois: b, tempo: t });
+      await updateResultadoDupla(duplaId, { status: "VALIDO", bois: b, tempo: t });
       setResultadoForm({ duplaId: "", bois: "", tempo: "" });
       setEditandoResultadoId(null);
       await carregarDados(provaAtual.id);
@@ -479,7 +481,7 @@ export default function RanchSortingApp() {
     }
     if (!confirm("Remover resultado?")) return;
     try {
-      await updateResultadoDupla(id, { bois: null, tempo: null });
+      await updateResultadoDupla(id, { status: "PENDENTE", bois: null, tempo: null });
       if (editandoResultadoId === id) cancelarEdicaoResultado();
       await carregarDados(provaAtual?.id || null);
       toast("Resultado removido!");
@@ -501,13 +503,16 @@ export default function RanchSortingApp() {
     }
     const [segundos, milisegundos] = tempoTelao.split(".").map(Number);
     const tempoEmSegundos = (segundos || 0) + (((milisegundos || 0)) / 1000);
+
+    setTimerRodando(false);
+    setTempoInicial(null);
+
     try {
-      await updateResultadoDupla(atual.id, { bois: "SAT", tempo: tempoEmSegundos });
+      await updateResultadoDupla(atual.id, { status: "SAT", bois: null, tempo: tempoEmSegundos });
       await carregarDados(provaAtual.id);
       toast(`Dupla marcada como SAT: ${atual.cavaleiro1}`);
       setTempoTelao("00.000");
       setBoisTelao("");
-      setTimerRodando(false);
     } catch (error) {
       toast(error.message || "Nao foi possivel marcar SAT.", "erro");
     }
@@ -522,13 +527,15 @@ export default function RanchSortingApp() {
     const [segundos, milisegundos] = tempoTelao.split(".").map(Number);
     const tempoEmSegundos = (segundos || 0) + ((milisegundos || 0) / 1000);
 
+    setTimerRodando(false);
+    setTempoInicial(null);
+
     try {
-      await updateResultadoDupla(atual.id, { bois, tempo: tempoEmSegundos });
+      await updateResultadoDupla(atual.id, { status: "VALIDO", bois, tempo: tempoEmSegundos });
       await carregarDados(provaAtual?.id || null);
       toast(`Dupla finalizada: ${atual.cavaleiro1} - ${bois} bois`);
       setTempoTelao("00.000");
       setBoisTelao("");
-      setTimerRodando(false);
     } catch (error) {
       toast(error.message || "Nao foi possivel finalizar a dupla.", "erro");
     }

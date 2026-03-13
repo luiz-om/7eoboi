@@ -1,19 +1,17 @@
 import { supabase } from "./supabase";
 
 const PROVAS_COLUMNS = "id, nome, local, data, observacoes, finalizada, finalizada_em, criada_em, updated_at, owner_id";
-const DUPLAS_COLUMNS = "id, prova_id, ordem, cavaleiro1, cavalo1, cavaleiro2, cavalo2, bois, tempo, criada_em, updated_at";
+const DUPLAS_COLUMNS = "id, prova_id, ordem, cavaleiro1, cavalo1, cavaleiro2, cavalo2, status, bois, tempo, criada_em, updated_at";
 
-function normalizarBois(valor) {
-  if (valor === null || valor === undefined) return null;
-  if (valor === "SAT") return "SAT";
-  const numero = Number(valor);
-  return Number.isNaN(numero) ? null : numero;
+function normalizarStatus(valor) {
+  if (valor === "VALIDO" || valor === "SAT") return valor;
+  return "PENDENTE";
 }
 
 function mapearBoisParaBanco(valor) {
   if (valor === null || valor === undefined || valor === "") return null;
-  if (valor === "SAT") return "SAT";
-  return String(valor);
+  const numero = Number(valor);
+  return Number.isNaN(numero) ? null : numero;
 }
 
 function normalizarDupla(row) {
@@ -25,7 +23,8 @@ function normalizarDupla(row) {
     cavalo1: row.cavalo1,
     cavaleiro2: row.cavaleiro2,
     cavalo2: row.cavalo2,
-    bois: normalizarBois(row.bois),
+    status: normalizarStatus(row.status),
+    bois: row.bois === null ? null : Number(row.bois),
     tempo: row.tempo === null ? null : Number(row.tempo),
     criadaEm: row.criada_em,
     updatedAt: row.updated_at,
@@ -158,6 +157,7 @@ export async function createDupla(payload) {
       cavalo1: payload.cavalo1,
       cavaleiro2: payload.cavaleiro2,
       cavalo2: payload.cavalo2,
+      status: payload.status ?? "PENDENTE",
       bois: mapearBoisParaBanco(payload.bois),
       tempo: payload.tempo,
     })
@@ -176,6 +176,7 @@ export async function updateDupla(id, payload) {
       cavalo1: payload.cavalo1,
       cavaleiro2: payload.cavaleiro2,
       cavalo2: payload.cavalo2,
+      status: payload.status ?? "PENDENTE",
       bois: mapearBoisParaBanco(payload.bois),
       tempo: payload.tempo,
     })
@@ -196,6 +197,7 @@ export async function updateResultadoDupla(id, payload) {
   const { data, error } = await supabase
     .from("duplas")
     .update({
+      status: payload.status ?? "PENDENTE",
       bois: mapearBoisParaBanco(payload.bois),
       tempo: payload.tempo,
     })
