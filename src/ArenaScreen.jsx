@@ -23,6 +23,7 @@ export default function ArenaScreen({
   const top3 = ranking.slice(0, 3);
   const medalhas = ["🥇", "🥈", "🥉"];
   const temPendentes = duplas.some((d) => d.bois === null);
+  const semDuplasCadastradas = duplas.length === 0;
   const provaEncerrada = provaFinalizada || !temPendentes;
 
   const fmt = (t) => (t == null ? "—" : t.toFixed(3) + "s");
@@ -71,10 +72,21 @@ export default function ArenaScreen({
         ) : (
           <div className="arena-complete-stack">
             <div className="arena-next arena-next-complete">
-              <div className="arena-next-label">✅ PROVA CONCLUÍDA</div>
-              <div style={{ marginTop: "8px", fontSize: "14px", color: "#22C55E" }}>
-                {ranking.length} duplas finalizadas
-              </div>
+              {semDuplasCadastradas && !provaFinalizada ? (
+                <>
+                  <div className="arena-next-label">⏳ AGUARDANDO</div>
+                  <div style={{ marginTop: "8px", fontSize: "14px", color: "#22C55E" }}>
+                    Aguadando inicio da prova.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="arena-next-label">✅ PROVA CONCLUÍDA</div>
+                  <div style={{ marginTop: "8px", fontSize: "14px", color: "#22C55E" }}>
+                    {ranking.length} duplas finalizadas
+                  </div>
+                </>
+              )}
             </div>
 
             {provaEncerrada && top3.length > 0 ? (
