@@ -5,12 +5,16 @@ import {
   createProva,
   deleteDupla,
   deleteProva,
-  ensureSignedIn,
+  getSession,
   listProvasComDuplas,
+  signInWithEmail,
+  signOut,
+  signUpWithEmail,
   updateDupla,
   updateProva,
   updateResultadoDupla,
 } from "./lib/ranchSortingApi";
+import AuthScreen from "./components/auth/AuthScreen";
 import { Btn, EmptyState, Input, ModernTab, Select, StatCard, TextArea } from "./components/ui";
 import {
   LIVE_CHANNEL_NAME,
@@ -53,6 +57,11 @@ export default function RanchSortingApp() {
   const [aba, setAba] = useState("provas");
   const [provas, setProvas] = useState([]);
   const [provaAtualId, setProvaAtualId] = useState(provaIdTelao);
+  const [sessao, setSessao] = useState(null);
+  const [authCarregando, setAuthCarregando] = useState(true);
+  const [authProcessando, setAuthProcessando] = useState(false);
+  const [authErro, setAuthErro] = useState("");
+  const [authInfo, setAuthInfo] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [form, setForm] = useState({ cavaleiro1: "", cavalo1: "", cavaleiro2: "", cavalo2: "" });
   const [resultadoForm, setResultadoForm] = useState({ duplaId: "", bois: "", tempo: "" });
@@ -114,6 +123,41 @@ export default function RanchSortingApp() {
 
   useEffect(() => {
     let ativo = true;
+
+    const iniciarSessao = async () => {
+      try {
+        const session = await getSession();
+        if (!ativo) return;
+        setSessao(session);
+      } catch (error) {
+        if (!ativo) return;
+        setAuthErro(error?.message || "Nao foi possivel verificar a sessao.");
+      } finally {
+        if (ativo) setAuthCarregando(false);
+      }
+    };
+
+    iniciarSessao();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSessao(session);
+      setAuthCarregando(false);
+    });
+
+    return () => {
+      ativo = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sessao) {
+      setProvas([]);
+      setCarregando(false);
+      return undefined;
+    }
+
+    let ativo = true;
     let timeoutId = null;
 
     const withTimeout = (promise, ms = 12000) =>
@@ -130,9 +174,6 @@ export default function RanchSortingApp() {
       try {
         setCarregando(true);
         setErroConexao("");
-        await withTimeout(ensureSignedIn());
-        if (!ativo) return;
-        window.clearTimeout(timeoutId);
         await withTimeout(carregarDados(isTelaoWindow ? provaIdTelao : null));
       } catch (error) {
         if (!ativo) return;
@@ -162,7 +203,68 @@ export default function RanchSortingApp() {
       if (timeoutId) window.clearTimeout(timeoutId);
       supabase.removeChannel(channel);
     };
-  }, [isTelaoWindow, provaIdTelao]);
+  }, [isTelaoWindow, provaIdTelao, sessao]);
+
+  async function handleSignIn({ email, password }) {
+    if (!email.trim() || !password) {
+      setAuthErro("Informe email e senha.");
+      return;
+    }
+
+    try {
+      setAuthProcessando(true);
+      setAuthErro("");
+      setAuthInfo("");
+      await signInWithEmail({ email, password });
+    } catch (error) {
+      setAuthErro(error?.message || "Nao foi possivel entrar.");
+    } finally {
+      setAuthProcessando(false);
+    }
+  }
+
+  async function handleSignUp({ email, password, confirmPassword }) {
+    if (!email.trim() || !password || !confirmPassword) {
+      setAuthErro("Preencha email, senha e confirmacao de senha.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setAuthErro("As senhas nao coincidem.");
+      return;
+    }
+
+    try {
+      setAuthProcessando(true);
+      setAuthErro("");
+      setAuthInfo("");
+      const data = await signUpWithEmail({ email, password });
+      if (data.session) {
+        setAuthInfo("Conta criada com sucesso.");
+      } else {
+        setAuthInfo("Conta criada. Verifique seu email para confirmar o cadastro.");
+      }
+    } catch (error) {
+      setAuthErro(error?.message || "Nao foi possivel criar a conta.");
+    } finally {
+      setAuthProcessando(false);
+    }
+  }
+
+  async function handleSignOut() {
+    try {
+      await signOut();
+      setAuthInfo("");
+      setAuthErro("");
+      setErroConexao("");
+      setMensagem(null);
+      setProvas([]);
+      setProvaAtualId("");
+      setAba("provas");
+    } catch (error) {
+      toast(error?.message || "Nao foi possivel sair da conta.", "erro");
+    }
+  }
 
   useEffect(() => {
     if (typeof BroadcastChannel === "undefined") return undefined;
@@ -664,11 +766,33 @@ export default function RanchSortingApp() {
     window.open(url, "telao", "width=1920,height=1080,fullscreen=yes");
   };
 
+  if (authCarregando) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#121212", display: "flex", alignItems: "center", justifyContent: "center", color: "#F4C542", fontFamily: "'Oswald',sans-serif", fontSize: "20px", gap: "12px" }}>
+        <span style={{ animation: "spin 1s linear infinite", display: "inline-block", fontSize: "32px" }}>🐄</span>
+        Verificando sessao...
+        <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+      </div>
+    );
+  }
+
+  if (!sessao) {
+    return (
+      <AuthScreen
+        loading={authProcessando}
+        error={authErro}
+        info={authInfo}
+        onSignIn={handleSignIn}
+        onSignUp={handleSignUp}
+      />
+    );
+  }
+
   if (carregando) {
     return (
       <div style={{ minHeight: "100vh", background: "#121212", display: "flex", alignItems: "center", justifyContent: "center", color: "#F4C542", fontFamily: "'Oswald',sans-serif", fontSize: "20px", gap: "12px" }}>
         <span style={{ animation: "spin 1s linear infinite", display: "inline-block", fontSize: "32px" }}>🐄</span>
-        Carregando...
+        Carregando dados...
         <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
       </div>
     );
@@ -729,6 +853,9 @@ export default function RanchSortingApp() {
             <span style={{ fontSize: "16px" }}>🪟</span>
             Telão
           </button>
+          <Btn variant="ghost" size="sm" onClick={handleSignOut}>
+            Sair
+          </Btn>
           <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#22C55E", boxShadow: "0 0 8px #22C55E", animation: "pulse 2s infinite" }}></div>
           <span style={{ fontSize: "11px", color: "#22C55E", fontFamily: "'Oswald',sans-serif", letterSpacing: "0.5px" }}>AO VIVO</span>
         </div>

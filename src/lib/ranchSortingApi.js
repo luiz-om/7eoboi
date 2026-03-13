@@ -53,8 +53,39 @@ function tratarErro(error, fallback) {
   return new Error(error.message || fallback);
 }
 
-export async function ensureSignedIn() {
-  return null;
+export async function getSession() {
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  if (error) throw tratarErro(error, "Nao foi possivel verificar a sessao.");
+  return session;
+}
+
+export async function signInWithEmail({ email, password }) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email.trim(),
+    password,
+  });
+
+  if (error) throw tratarErro(error, "Nao foi possivel entrar com email e senha.");
+  return data.session;
+}
+
+export async function signUpWithEmail({ email, password }) {
+  const { data, error } = await supabase.auth.signUp({
+    email: email.trim(),
+    password,
+  });
+
+  if (error) throw tratarErro(error, "Nao foi possivel criar a conta.");
+  return data;
+}
+
+export async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw tratarErro(error, "Nao foi possivel encerrar a sessao.");
 }
 
 export async function listProvasComDuplas() {
