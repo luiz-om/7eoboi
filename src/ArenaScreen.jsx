@@ -1,79 +1,34 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
-export default function ArenaScreen({ duplas, ranking, tempo, provaFinalizada = false }) {
-  const provaIdTelao = new URLSearchParams(window.location.search).get("prova");
-  const carregarProvaAtual = () => {
-    try {
-      const provas = JSON.parse(localStorage.getItem("provas") || "[]");
-      const provaAtualId = provaIdTelao || localStorage.getItem("provaAtualId");
-      const prova = provas.find((item) => item.id === provaAtualId);
-      const duplasProva = prova?.duplas || duplas;
-      const rankingProva = [...duplasProva]
-        .filter((d) => d.bois !== null && d.bois !== "SAT")
-        .sort((a, b) =>
-          b.bois !== a.bois ? b.bois - a.bois : a.tempo - b.tempo,
-        );
-      return {
-        duplas: duplasProva,
-        ranking: rankingProva.length > 0 ? rankingProva : ranking,
-        nome: prova?.nome || "Ranch Sorting",
-      };
-    } catch {
-      return { duplas, ranking, nome: "Ranch Sorting" };
-    }
-  };
+export default function ArenaScreen({
+  duplas,
+  ranking,
+  tempo,
+  nomeProva = "Ranch Sorting",
+  provaFinalizada = false,
+}) {
   const [animacoes, setAnimacoes] = useState(new Set());
-  const [tempoAtualizado, setTempoAtualizado] = useState(tempo);
-  const estadoInicial = carregarProvaAtual();
-  const [duplasAtualizado, setDuplasAtualizado] = useState(estadoInicial.duplas);
-  const [rankingAtualizado, setRankingAtualizado] = useState(estadoInicial.ranking);
-  const [nomeProva, setNomeProva] = useState(estadoInicial.nome);
 
-  // Sincroniza tempo com localStorage
-  useEffect(() => {
-    setTempoAtualizado(tempo);
-  }, [tempo]);
-
-  // Listener para mudanças em localStorage (tempo, duplas, ranking)
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const novoTempo = localStorage.getItem("tempoTelao");
-      if (novoTempo) {
-        setTempoAtualizado(novoTempo);
-      }
-
-      const estado = carregarProvaAtual();
-      setDuplasAtualizado(estado.duplas);
-      setRankingAtualizado(estado.ranking);
-      setNomeProva(estado.nome);
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
-
-  // Animar ranking quando renderizar
   useEffect(() => {
     const timer = setTimeout(() => {
       const novasAnimacoes = new Set();
-      rankingAtualizado.slice(0, 5).forEach((_, i) => novasAnimacoes.add(i));
+      ranking.slice(0, 5).forEach((_, i) => novasAnimacoes.add(i));
       setAnimacoes(novasAnimacoes);
     }, 100);
     return () => clearTimeout(timer);
-  }, [rankingAtualizado]);
+  }, [ranking]);
 
-  const proximaDupla = duplasAtualizado.find((d) => d.bois === null);
-  const top5 = rankingAtualizado.slice(0, 5);
-  const top3 = rankingAtualizado.slice(0, 3);
+  const proximaDupla = duplas.find((d) => d.bois === null);
+  const top5 = ranking.slice(0, 5);
+  const top3 = ranking.slice(0, 3);
   const medalhas = ["🥇", "🥈", "🥉"];
-  const temPendentes = duplasAtualizado.some((d) => d.bois === null);
+  const temPendentes = duplas.some((d) => d.bois === null);
   const provaEncerrada = provaFinalizada || !temPendentes;
 
   const fmt = (t) => (t == null ? "—" : t.toFixed(3) + "s");
 
   return (
     <div className="arena-screen">
-      {/* HEADER */}
       <div className="arena-header">
         <div className="arena-header-content">
           <div className="arena-title">🐄 Ranch Sorting 🐴</div>
@@ -81,50 +36,34 @@ export default function ArenaScreen({ duplas, ranking, tempo, provaFinalizada = 
         </div>
       </div>
 
-      {/* MAIN CONTENT */}
       <div className="arena-main">
-        {/* TIMER */}
         <div className="arena-timer-container">
-          <div className="arena-timer">{tempoAtualizado}</div>
+          <div className="arena-timer">{tempo}</div>
           <div className="arena-timer-label">TEMPO</div>
         </div>
 
-        {/* DUPLA ATUAL E PRÓXIMA */}
         {temPendentes && proximaDupla ? (
           <div className="arena-competitors-wrapper">
-            {/* DUPLA ATUAL */}
             <div className="arena-next arena-current-highlight">
               <div className="arena-next-label">🐴 DUPLA ATUAL</div>
               <div className="arena-next-riders">
-                {proximaDupla.cavaleiro1}{" "}
-                <span className="arena-separator">&</span>{" "}
-                {proximaDupla.cavaleiro2}
+                {proximaDupla.cavaleiro1} <span className="arena-separator">&</span> {proximaDupla.cavaleiro2}
               </div>
               <div className="arena-next-horses">
                 🐴 {proximaDupla.cavalo1} • {proximaDupla.cavalo2}
               </div>
             </div>
 
-            {/* PRÓXIMA DUPLA */}
-            {duplasAtualizado.filter((d) => d.bois === null).length > 1 ? (
+            {duplas.filter((d) => d.bois === null).length > 1 ? (
               <div className="arena-next arena-upcoming">
                 <div className="arena-next-label secondary">➡️ PRÓXIMA</div>
                 <div className="arena-next-riders secondary-riders">
-                  {
-                    duplasAtualizado.filter((d) => d.bois === null)[1]
-                      ?.cavaleiro1
-                  }
+                  {duplas.filter((d) => d.bois === null)[1]?.cavaleiro1}
                   <span className="arena-separator">&</span>
-                  {
-                    duplasAtualizado.filter((d) => d.bois === null)[1]
-                      ?.cavaleiro2
-                  }
+                  {duplas.filter((d) => d.bois === null)[1]?.cavaleiro2}
                 </div>
                 <div className="arena-next-horses">
-                  🐴{" "}
-                  {duplasAtualizado.filter((d) => d.bois === null)[1]?.cavalo1}{" "}
-                  ·{" "}
-                  {duplasAtualizado.filter((d) => d.bois === null)[1]?.cavalo2}
+                  🐴 {duplas.filter((d) => d.bois === null)[1]?.cavalo1} · {duplas.filter((d) => d.bois === null)[1]?.cavalo2}
                 </div>
               </div>
             ) : null}
@@ -133,10 +72,8 @@ export default function ArenaScreen({ duplas, ranking, tempo, provaFinalizada = 
           <div className="arena-complete-stack">
             <div className="arena-next arena-next-complete">
               <div className="arena-next-label">✅ PROVA CONCLUÍDA</div>
-              <div
-                style={{ marginTop: "8px", fontSize: "14px", color: "#22C55E" }}
-              >
-                {rankingAtualizado.length} duplas finalizadas
+              <div style={{ marginTop: "8px", fontSize: "14px", color: "#22C55E" }}>
+                {ranking.length} duplas finalizadas
               </div>
             </div>
 
@@ -162,26 +99,19 @@ export default function ArenaScreen({ duplas, ranking, tempo, provaFinalizada = 
         )}
       </div>
 
-      {/* RANKING BOTTOM */}
       <div className="arena-ranking">
         <div className="arena-ranking-header">🏆 TOP 5 RANKING 🏆</div>
         <div className="arena-ranking-list">
           {top5.length === 0 ? (
-            <div className="arena-ranking-empty">
-              Nenhum resultado registrado
-            </div>
+            <div className="arena-ranking-empty">Nenhum resultado registrado</div>
           ) : (
             top5.map((dp, i) => (
               <div
                 key={dp.id}
                 className={`arena-rank-row ${animacoes.has(i) ? "arena-rank-animated" : ""}`}
-                style={{
-                  animationDelay: animacoes.has(i) ? `${i * 0.1}s` : "0s",
-                }}
+                style={{ animationDelay: animacoes.has(i) ? `${i * 0.1}s` : "0s" }}
               >
-                <div className="arena-rank-position">
-                  {i < 3 ? medalhas[i] : i + 1}
-                </div>
+                <div className="arena-rank-position">{i < 3 ? medalhas[i] : i + 1}</div>
                 <div className="arena-rank-team">
                   <div className="arena-rank-name">
                     {dp.cavaleiro1} & {dp.cavaleiro2}
@@ -200,12 +130,7 @@ export default function ArenaScreen({ duplas, ranking, tempo, provaFinalizada = 
         </div>
       </div>
 
-      {/* EXIT BUTTON */}
-      <button
-        onClick={() => window.close()}
-        className="arena-exit-btn"
-        title="Fechar janela do Telão"
-      >
+      <button onClick={() => window.close()} className="arena-exit-btn" title="Fechar janela do Telão">
         ✕
       </button>
 
@@ -260,496 +185,287 @@ export default function ArenaScreen({ duplas, ranking, tempo, provaFinalizada = 
           flex: 1;
           display: flex;
           flex-direction: column;
-          align-items: center;
           justify-content: center;
-          gap: 80px;
-          padding: 60px 24px;
-          position: relative;
+          padding: 24px 32px;
+          max-width: 1600px;
+          width: 100%;
+          margin: 0 auto;
         }
 
         .arena-timer-container {
           text-align: center;
+          margin-bottom: 32px;
         }
 
         .arena-timer {
-          font-size: clamp(80px, 15vw, 220px);
+          font-size: clamp(72px, 16vw, 180px);
+          font-family: 'Courier New', monospace;
           font-weight: 800;
           color: #22C55E;
-          line-height: 1;
-          text-shadow: 0 0 30px rgba(34, 197, 94, 0.4);
-          letter-spacing: -2px;
-          font-family: 'Courier New', monospace;
-          font-weight: 700;
+          letter-spacing: -4px;
+          line-height: 0.9;
+          text-shadow: 0 0 30px rgba(34, 197, 94, 0.3);
         }
 
         .arena-timer-label {
-          font-size: clamp(16px, 3vw, 32px);
-          color: #F4C542;
-          letter-spacing: 3px;
+          font-size: clamp(14px, 2vw, 24px);
+          color: #666;
+          letter-spacing: 4px;
           text-transform: uppercase;
           margin-top: 8px;
-          font-weight: 700;
+        }
+
+        .arena-competitors-wrapper {
+          display: grid;
+          grid-template-columns: 2fr 1fr;
+          gap: 24px;
+          align-items: stretch;
         }
 
         .arena-next {
-          background: linear-gradient(135deg, #1A1A1A 0%, #242424 100%);
-          border: 3px solid #F4C542;
-          border-radius: 16px;
-          padding: 24px;
-          text-align: center;
-          max-width: 800px;
-          width: 100%;
+          border-radius: 20px;
+          padding: 28px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+
+        .arena-current-highlight {
+          background: linear-gradient(135deg, #0F2F0F 0%, #1A4A1A 100%);
+          border: 3px solid #22C55E;
+          box-shadow: 0 0 40px rgba(34, 197, 94, 0.2);
+        }
+
+        .arena-upcoming {
+          background: linear-gradient(135deg, #1F1F0F 0%, #2A2A15 100%);
+          border: 2px solid #C98A2E;
         }
 
         .arena-next-complete {
-          border-color: #22C55E;
-          background: linear-gradient(135deg, #0F1F0F 0%, #1A2A1A 100%);
+          background: linear-gradient(135deg, #0F2F0F 0%, #1A4A1A 100%);
+          border: 3px solid #22C55E;
+          text-align: center;
+        }
+
+        .arena-next-label {
+          font-size: clamp(18px, 2vw, 28px);
+          font-weight: 700;
+          color: #22C55E;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          margin-bottom: 20px;
+        }
+
+        .arena-next-label.secondary {
+          color: #C98A2E;
+          margin-bottom: 16px;
+        }
+
+        .arena-next-riders {
+          font-size: clamp(28px, 3.5vw, 56px);
+          font-weight: 700;
+          color: #F0F0F0;
+          line-height: 1.1;
+          margin-bottom: 12px;
+        }
+
+        .secondary-riders {
+          font-size: clamp(20px, 2.2vw, 36px);
+          color: #C98A2E;
+        }
+
+        .arena-separator {
+          color: #666;
+          margin: 0 8px;
+        }
+
+        .arena-next-horses {
+          font-size: clamp(16px, 1.8vw, 28px);
+          color: #888;
+          font-weight: 500;
         }
 
         .arena-complete-stack {
-          width: 100%;
-          max-width: 1080px;
           display: flex;
           flex-direction: column;
-          gap: 20px;
-          align-items: center;
+          gap: 24px;
         }
 
         .arena-podium {
-          width: 100%;
-          background: linear-gradient(135deg, rgba(20, 16, 0, 0.95) 0%, rgba(28, 24, 0, 0.92) 100%);
-          border: 2px solid rgba(244, 197, 66, 0.25);
-          border-radius: 18px;
-          padding: 22px;
-          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+          background: linear-gradient(135deg, #141000 0%, #1C1800 100%);
+          border: 2px solid #F4C542;
+          border-radius: 20px;
+          padding: 28px;
         }
 
         .arena-podium-title {
-          text-align: center;
-          font-size: clamp(18px, 2.2vw, 30px);
+          font-size: clamp(24px, 2.5vw, 40px);
+          font-weight: 700;
           color: #F4C542;
+          text-align: center;
           text-transform: uppercase;
           letter-spacing: 2px;
-          font-weight: 700;
-          margin-bottom: 16px;
+          margin-bottom: 24px;
         }
 
         .arena-podium-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 14px;
+          gap: 16px;
         }
 
         .arena-podium-card {
-          background: rgba(11, 11, 11, 0.7);
-          border: 1px solid rgba(244, 197, 66, 0.18);
-          border-radius: 14px;
-          padding: 18px 16px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(244, 197, 66, 0.2);
+          border-radius: 16px;
+          padding: 20px 16px;
           text-align: center;
         }
 
         .arena-podium-medal {
-          font-size: clamp(28px, 3vw, 40px);
-          margin-bottom: 8px;
+          font-size: clamp(32px, 3vw, 48px);
+          margin-bottom: 12px;
         }
 
         .arena-podium-name {
-          font-size: clamp(16px, 1.8vw, 24px);
-          color: #F0F0F0;
+          font-size: clamp(16px, 1.6vw, 24px);
           font-weight: 700;
+          color: #F0F0F0;
+          margin-bottom: 8px;
           line-height: 1.2;
         }
 
         .arena-podium-meta {
-          margin-top: 8px;
-          font-size: clamp(13px, 1.3vw, 18px);
-          color: #22C55E;
-          letter-spacing: 0.5px;
-        }
-
-        .arena-next-label {
-          font-size: clamp(12px, 2vw, 20px);
-          color: #F4C542;
-          letter-spacing: 2px;
-          text-transform: uppercase;
-          font-weight: 700;
-          margin-bottom: 8px;
-        }
-
-        .arena-next-complete .arena-next-label {
-          color: #22C55E;
-        }
-
-/* Container que envolve as duas caixas */
-.arena-competitors-wrapper {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: stretch;
-  gap: 40px;
-  width: 100%;
-  max-width: 1400px;
-}
-  /* Estilo específico para a "Próxima Dupla" não ficar gigante mas caber o nome */
-.arena-upcoming {
-  flex: 0 1 400px; /* Não deixa crescer demais, mas permite espaço */
-  border-color: #C98A2E !important;
-  opacity: 0.9;
-}
-
-.secondary-riders {
-  font-size: clamp(18px, 3vw, 32px) !important;
-}
-
-/* RESPONSIVIDADE PARA TELAS MENORES */
-@media (max-width: 1024px) {
-  .arena-competitors-wrapper {
-    flex-direction: column; /* Empilha uma em cima da outra */
-    align-items: center;
-    gap: 20px;
-  }
-  
-  .arena-upcoming {
-    width: 100%;
-    max-width: 100%;
-  }
-}
-
-/* Removemos o 'white-space: nowrap' das classes de ranking também */
-.arena-rank-name {
-  font-size: clamp(13px, 2vw, 16px);
-  font-weight: 700;
-  color: #F0F0F0;
-  /* Removido o nowrap e ellipsis para nomes grandes no ranking */
-  line-height: 1.2;
-}
-
-/* Ajuste das caixas de texto para permitir quebra de linha */
-.arena-next-riders {
-  font-size: clamp(24px, 5vw, 52px);
-  font-weight: 700;
-  color: #F0F0F0;
-  line-height: 1.2; /* Aumentado para não sobrepor linhas */
-  margin-bottom: 12px;
-  word-wrap: break-word; /* Força quebra de palavra se necessário */
-  overflow-wrap: break-word;
-}
-
-        .arena-separator {
+          font-size: clamp(12px, 1.2vw, 16px);
           color: #C98A2E;
-          margin: 0 8px;
-        }
-
-        .arena-next-horses {
-          font-size: clamp(16px, 3vw, 28px);
-          color: #22C55E;
-          font-weight: 600;
         }
 
         .arena-ranking {
-          background: linear-gradient(135deg, #1A1A1A 0%, #161616 100%);
+          background: linear-gradient(180deg, #111111 0%, #0B0B0B 100%);
           border-top: 3px solid #F4C542;
-          padding: 20px 24px;
-          max-width: 1400px;
-          margin: 0 auto;
-          width: 100%;
+          padding: 20px 32px 24px;
         }
 
         .arena-ranking-header {
-          font-size: clamp(16px, 3vw, 28px);
+          font-size: clamp(18px, 2vw, 32px);
           font-weight: 700;
           color: #F4C542;
           text-align: center;
-          letter-spacing: 2px;
           text-transform: uppercase;
-          margin-bottom: 12px;
+          letter-spacing: 2px;
+          margin-bottom: 16px;
         }
 
         .arena-ranking-list {
-          display: flex;
-          gap: 12px;
-          justify-content: center;
-          flex-wrap: wrap;
+          display: grid;
+          gap: 8px;
+          max-width: 1600px;
+          margin: 0 auto;
         }
 
         .arena-ranking-empty {
           text-align: center;
           color: #555;
-          font-size: 16px;
-          padding: 16px;
+          font-size: 18px;
+          padding: 20px;
         }
 
         .arena-rank-row {
-          display: flex;
+          display: grid;
+          grid-template-columns: 80px 1fr auto;
+          gap: 20px;
           align-items: center;
-          gap: 12px;
-          background: #242424;
+          background: #1A1A1A;
           border: 1px solid #2A2A2A;
           border-radius: 12px;
-          padding: 12px 16px;
-          flex: 1;
-          min-width: 200px;
-          max-width: 280px;
-        }
-
-        .arena-rank-row.arena-rank-animated {
-          animation: arenaRankSlideUp 0.5s ease-out forwards;
+          padding: 14px 20px;
           opacity: 0;
+          transform: translateX(-20px);
         }
 
-        @keyframes arenaRankSlideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+        .arena-rank-animated {
+          animation: slideInRank 0.5s ease-out forwards;
         }
 
         .arena-rank-position {
-          width: 48px;
-          height: 48px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: clamp(24px, 4vw, 32px);
+          font-size: clamp(24px, 2.5vw, 40px);
           font-weight: 700;
-          flex-shrink: 0;
-        }
-
-        .arena-rank-team {
-          flex: 1;
-          min-width: 0;
+          color: #F4C542;
+          text-align: center;
         }
 
         .arena-rank-name {
-          font-size: clamp(13px, 2vw, 16px);
+          font-size: clamp(16px, 1.6vw, 26px);
           font-weight: 700;
           color: #F0F0F0;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          line-height: 1.1;
         }
 
         .arena-rank-horses {
-          font-size: clamp(11px, 1.5vw, 13px);
-          color: #555;
-          margin-top: 2px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          font-size: clamp(12px, 1.2vw, 18px);
+          color: #666;
+          margin-top: 4px;
         }
 
         .arena-rank-stats {
           text-align: right;
-          flex-shrink: 0;
         }
 
         .arena-rank-bois {
-          font-size: clamp(18px, 3vw, 24px);
+          font-size: clamp(20px, 2vw, 32px);
           font-weight: 800;
           color: #22C55E;
+          line-height: 1;
         }
 
         .arena-rank-time {
-          font-size: clamp(11px, 1.5vw, 14px);
-          color: #555;
-          margin-top: 2px;
+          font-size: clamp(12px, 1.2vw, 18px);
+          color: #666;
+          margin-top: 4px;
         }
 
         .arena-exit-btn {
           position: fixed;
-          bottom: 24px;
-          right: 24px;
-          width: 56px;
-          height: 56px;
+          top: 20px;
+          right: 20px;
+          width: 48px;
+          height: 48px;
           border-radius: 50%;
-          background: #EF4444;
           border: none;
-          color: #fff;
-          font-size: 28px;
+          background: rgba(239, 68, 68, 0.9);
+          color: white;
+          font-size: 24px;
           cursor: pointer;
-          box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
-          transition: all 0.2s;
+          z-index: 10000;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-weight: 700;
-          z-index: 10000;
+          transition: all 0.2s;
+          box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
         }
 
         .arena-exit-btn:hover {
-          background: #DC2626;
-          box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6);
-          transform: scale(1.05);
+          background: #EF4444;
+          transform: scale(1.1);
         }
 
-        .arena-exit-btn:active {
-          transform: scale(0.95);
-        }
-
-        /* Responsivo para telas grandes */
-        @media (min-width: 1600px) {
-          .arena-main {
-            gap: 48px;
-          }
-
-          .arena-ranking-list {
-            gap: 16px;
-          }
-
-          .arena-rank-row {
-            max-width: 320px;
+        @keyframes slideInRank {
+          to {
+            opacity: 1;
+            transform: translateX(0);
           }
         }
 
-        /* Responsivo para telas pequenas */
         @media (max-width: 1024px) {
-          .arena-main {
-            gap: 40px;
-            padding: 40px 16px;
-          }
-
+          .arena-competitors-wrapper,
           .arena-podium-grid {
             grid-template-columns: 1fr;
           }
 
-          .arena-timer {
-            font-size: clamp(60px, 12vw, 120px) !important;
-          }
-
-          .arena-next {
-            max-width: 100%;
-            padding: 16px;
-          }
-
-          .arena-next-riders {
-            font-size: clamp(18px, 4vw, 40px);
-          }
-
-          .arena-ranking-list {
-            gap: 8px;
-            flex-direction: column;
-          }
-
           .arena-rank-row {
-            min-width: auto;
-            max-width: none;
-          }
-
-          .arena-exit-btn {
-            bottom: 16px;
-            right: 16px;
-            width: 48px;
-            height: 48px;
-            font-size: 24px;
-          }
-        }
-
-        @media (max-width: 768px) {
-          .arena-main {
-            gap: 30px;
-            padding: 30px 12px;
-          }
-
-          .arena-timer {
-            font-size: clamp(48px, 10vw, 80px) !important;
-          }
-
-          .arena-timer-label {
-            font-size: 14px;
-          }
-
-          .arena-next {
-            max-width: 100%;
-            padding: 12px;
-            border-width: 2px;
-          }
-
-          .arena-next-label {
-            font-size: clamp(10px, 2.5vw, 16px);
-          }
-
-          .arena-next-riders {
-            font-size: clamp(14px, 3.5vw, 32px);
-            margin-bottom: 6px;
-          }
-
-          .arena-next-horses {
-            font-size: clamp(10px, 2vw, 14px);
-          }
-
-          .arena-ranking {
-            padding: 16px 12px;
-          }
-
-          .arena-ranking-header {
-            font-size: clamp(14px, 3vw, 20px);
-          }
-
-          .arena-rank-row {
-            padding: clamp(8px, 2vw, 14px);
-            gap: 8px;
-          }
-
-          .arena-rank-num {
-            font-size: clamp(16px, 3vw, 24px);
-            width: 36px;
-            height: 36px;
-          }
-
-          .arena-exit-btn {
-            bottom: 12px;
-            right: 12px;
-            width: 44px;
-            height: 44px;
-            font-size: 20px;
-          }
-        }
-
-        @media (max-width: 480px) {
-          .arena-screen {
-            padding: 0;
-          }
-
-          .arena-header {
-            padding: 12px;
-          }
-
-          .arena-title {
-            font-size: clamp(18px, 5vw, 28px);
-          }
-
-          .arena-subtitle {
-            font-size: clamp(10px, 2vw, 16px);
-          }
-
-          .arena-main {
-            gap: 20px;
-            padding: 20px 8px;
-          }
-
-          .arena-timer {
-            font-size: clamp(40px, 8vw, 64px) !important;
-          }
-
-          .arena-next {
-            padding: 10px;
-            border-width: 1px;
-          }
-
-          .arena-next-riders {
-            font-size: clamp(12px, 3vw, 24px);
-          }
-
-          .arena-podium {
-            padding: 14px 12px;
-          }
-
-          .arena-ranking {
-            padding: 12px 8px;
+            grid-template-columns: 56px 1fr auto;
+            gap: 12px;
+            padding: 12px 14px;
           }
         }
       `}</style>
