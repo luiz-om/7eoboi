@@ -11,114 +11,20 @@ import {
   updateProva,
   updateResultadoDupla,
 } from "./lib/ranchSortingApi";
+import { Btn, EmptyState, Input, ModernTab, Select, StatCard, TextArea } from "./components/ui";
+import {
+  LIVE_CHANNEL_NAME,
+  duplaConcluida,
+  duplaSat,
+  escaparCsv,
+  formatarBois,
+  formatarData,
+  gerarListaRankingCompleta,
+  gerarRanking,
+  gerarRankingCavalos,
+  listarCavalosPremiados,
+} from "./lib/ranchSortingUtils";
 import { supabase } from "./lib/supabase";
-
-function escaparCsv(valor) {
-  return `"${String(valor).replace(/"/g, '""')}"`;
-}
-
-function formatarData(valor) {
-  if (!valor) return "Sem data";
-  const data = new Date(`${valor}T12:00:00`);
-  if (Number.isNaN(data.getTime())) return valor;
-  return data.toLocaleDateString("pt-BR");
-}
-
-function gerarRanking(duplas = []) {
-  return [...duplas]
-    .filter(item => item.bois !== null && item.bois !== "SAT")
-    .sort((a, b) => (b.bois !== a.bois ? b.bois - a.bois : a.tempo - b.tempo));
-}
-
-function gerarListaRankingCompleta(duplas = []) {
-  const ranking = gerarRanking(duplas);
-  const sat = duplas.filter(item => item.bois === "SAT");
-  return [...ranking, ...sat];
-}
-
-function duplaConcluida(dupla) {
-  return dupla?.bois !== null;
-}
-
-function duplaSat(dupla) {
-  return dupla?.bois === "SAT";
-}
-
-function formatarBois(dupla) {
-  return duplaSat(dupla) ? "SAT" : `${dupla.bois} 🐄`;
-}
-
-const PREMIACAO_CAVALOS = [
-  { colocacao: 1, titulo: "Campeao", medalha: "🥇", pontos: 5, cor: "#F4C542" },
-  { colocacao: 2, titulo: "Vice-campeao", medalha: "🥈", pontos: 3, cor: "#C0C0C0" },
-  { colocacao: 3, titulo: "3º Lugar", medalha: "🥉", pontos: 1, cor: "#CD7F32" },
-];
-
-const LIVE_CHANNEL_NAME = "ranch-sorting-live";
-
-function listarCavalosPremiados(prova) {
-  if (!prova) return [];
-  return gerarRanking(prova.duplas || [])
-    .slice(0, 3)
-    .flatMap((dupla, index) => {
-      const premio = PREMIACAO_CAVALOS[index];
-      if (!premio) return [];
-      return [
-        {
-          id: `${dupla.id}-c1`,
-          cavalo: dupla.cavalo1,
-          cavaleiro: dupla.cavaleiro1,
-          dupla,
-          ...premio,
-        },
-        {
-          id: `${dupla.id}-c2`,
-          cavalo: dupla.cavalo2,
-          cavaleiro: dupla.cavaleiro2,
-          dupla,
-          ...premio,
-        },
-      ];
-    });
-}
-
-function gerarRankingCavalos(provas = [], { provaId = null, apenasFinalizadas = false } = {}) {
-  const mapa = new Map();
-  provas
-    .filter(prova => (provaId ? prova.id === provaId : true))
-    .filter(prova => (apenasFinalizadas ? prova.finalizada : true))
-    .forEach(prova => {
-      listarCavalosPremiados(prova).forEach(item => {
-        const chave = item.cavalo.trim().toLowerCase();
-        const atual = mapa.get(chave) || {
-          cavalo: item.cavalo,
-          pontos: 0,
-          ouro: 0,
-          prata: 0,
-          bronze: 0,
-          premiacoes: 0,
-          provas: new Set(),
-        };
-        atual.pontos += item.pontos;
-        atual.premiacoes += 1;
-        atual.provas.add(prova.id);
-        if (item.colocacao === 1) atual.ouro += 1;
-        if (item.colocacao === 2) atual.prata += 1;
-        if (item.colocacao === 3) atual.bronze += 1;
-        mapa.set(chave, atual);
-      });
-    });
-
-  return [...mapa.values()]
-    .map(item => ({ ...item, provas: item.provas.size }))
-    .sort((a, b) =>
-      b.pontos - a.pontos ||
-      b.ouro - a.ouro ||
-      b.prata - a.prata ||
-      b.bronze - a.bronze ||
-      a.cavalo.localeCompare(b.cavalo, "pt-BR")
-    );
-}
 
 function usePWA() {
   useEffect(() => {
@@ -136,111 +42,6 @@ function usePWA() {
 }
 
 const LOGO_B64 = "data:image/png;base64,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";
-
-function StatCard({ value, label, color }) {
-  return (
-    <div style={{ textAlign: "center", padding: "12px 6px" }}>
-      <div style={{ fontSize: "clamp(20px,5vw,30px)", fontWeight: 700, color, fontFamily: "'Oswald',sans-serif", lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: "10px", color: "#555", textTransform: "uppercase", letterSpacing: "1px", marginTop: "3px" }}>{label}</div>
-    </div>
-  );
-}
-
-function ModernTab({ id, label, icon, active, onClick }) {
-  return (
-    <button onClick={() => onClick(id)} style={{
-      flex: 1, padding: "13px 6px", border: "none", cursor: "pointer", background: "transparent",
-      fontFamily: "'Oswald',sans-serif", fontSize: "clamp(11px,3vw,13px)", fontWeight: 500,
-      letterSpacing: "0.5px", textTransform: "uppercase", transition: "all 0.2s", touchAction: "manipulation",
-      color: active ? "#F4C542" : "#555", borderBottom: active ? "2px solid #C98A2E" : "2px solid transparent",
-      display: "flex", flexDirection: "column", alignItems: "center", gap: "3px"
-    }}>
-      <span style={{ fontSize: "18px" }}>{icon}</span>
-      {label}
-    </button>
-  );
-}
-
-function Input({ label, ...props }) {
-  return (
-    <div>
-      {label && <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.8px", fontFamily: "'Oswald',sans-serif" }}>{label}</label>}
-      <input
-        {...props}
-        style={{
-          width: "100%", padding: "13px 12px", borderRadius: "8px",
-          border: "1px solid #2A2A2A", background: "#252525", color: "#F0F0F0",
-          fontSize: "16px", fontFamily: "inherit", boxSizing: "border-box", outline: "none", ...props.style
-        }}
-        onFocus={e => e.target.style.borderColor = "#C98A2E"}
-        onBlur={e => { e.target.style.borderColor = "#2A2A2A"; props.onBlur && props.onBlur(e); }}
-      />
-    </div>
-  );
-}
-
-function Select({ label, children, ...props }) {
-  return (
-    <div>
-      {label && <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.8px", fontFamily: "'Oswald',sans-serif" }}>{label}</label>}
-      <div style={{ position: "relative" }}>
-        <select {...props} style={{
-          width: "100%", padding: "13px 36px 13px 12px", borderRadius: "8px",
-          border: "1px solid #2A2A2A", background: "#252525", color: props.value ? "#F0F0F0" : "#555",
-          fontSize: "16px", fontFamily: "inherit", boxSizing: "border-box", outline: "none",
-          appearance: "none", WebkitAppearance: "none"
-        }}>{children}</select>
-        <span style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "#555", pointerEvents: "none", fontSize: "12px" }}>▼</span>
-      </div>
-    </div>
-  );
-}
-
-function TextArea({ label, ...props }) {
-  return (
-    <div>
-      {label && <label style={{ display: "block", fontSize: "11px", color: "#666", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.8px", fontFamily: "'Oswald',sans-serif" }}>{label}</label>}
-      <textarea
-        {...props}
-        style={{
-          width: "100%", minHeight: "90px", padding: "13px 12px", borderRadius: "8px",
-          border: "1px solid #2A2A2A", background: "#252525", color: "#F0F0F0",
-          fontSize: "15px", fontFamily: "inherit", boxSizing: "border-box", outline: "none", resize: "vertical", ...props.style
-        }}
-      />
-    </div>
-  );
-}
-
-function Btn({ children, variant = "primary", size = "md", full, style: s = {}, ...props }) {
-  const sizes = { sm: { padding: "9px 12px", fontSize: "12px" }, md: { padding: "14px 18px", fontSize: "13px" }, lg: { padding: "17px 22px", fontSize: "15px" } };
-  const variants = {
-    primary: { background: "linear-gradient(135deg,#C98A2E,#8B5E1A)", color: "#fff", boxShadow: "0 3px 10px rgba(201,138,46,0.25)", border: "none" },
-    success: { background: "linear-gradient(135deg,#22C55E,#16A34A)", color: "#fff", boxShadow: "0 3px 10px rgba(34,197,94,0.25)", border: "none" },
-    secondary: { background: "#252525", color: "#C98A2E", border: "1px solid #C98A2E33" },
-    danger: { background: "transparent", color: "#EF4444", border: "1px solid #EF444430" },
-    ghost: { background: "transparent", color: "#666", border: "1px solid #2A2A2A" },
-    amber: { background: "linear-gradient(135deg,#D4A017,#A07010)", color: "#fff", border: "none" },
-  };
-  return (
-    <button style={{
-      ...sizes[size], ...variants[variant], borderRadius: "8px", cursor: "pointer",
-      fontFamily: "'Oswald',sans-serif", fontWeight: 600, letterSpacing: "0.8px",
-      textTransform: "uppercase", transition: "all 0.15s", touchAction: "manipulation",
-      width: full ? "100%" : "auto", ...s
-    }} {...props}>{children}</button>
-  );
-}
-
-function EmptyState({ title, text, icon = "🐄" }) {
-  return (
-    <div style={{ textAlign: "center", color: "#333", padding: "40px 16px", border: "1px dashed #2A2A2A", borderRadius: "12px" }}>
-      <div style={{ fontSize: "36px", marginBottom: "8px" }}>{icon}</div>
-      <div style={{ fontFamily: "'Oswald',sans-serif", color: "#444", marginBottom: "6px" }}>{title}</div>
-      {text ? <div style={{ fontSize: "12px", color: "#555" }}>{text}</div> : null}
-    </div>
-  );
-}
 
 export default function RanchSortingApp() {
   usePWA();
