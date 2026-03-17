@@ -1,0 +1,8 @@
+{
+  "name": "Ranch Sorting - Manejo Solucoes",
+  "short_name": "Ranch Sorting",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#C98A2E"
+}
