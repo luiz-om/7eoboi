@@ -107,31 +107,30 @@ export default function ArenaScreen({
                 </>
               )}
             </div>
-
-            {provaEncerrada && top3.length > 0 ? (
-              <div className="arena-podium">
-                <div className="arena-podium-title">Resultado Final</div>
-                <div className="arena-podium-grid">
-                  {top3.map((dp, index) => (
-                    <div key={dp.id} className="arena-podium-card">
-                      <div className="arena-podium-medal">{medalhas[index]}</div>
-                      <div className="arena-podium-name">
-                        {dp.cavaleiro1} & {dp.cavaleiro2}
-                      </div>
-                      <div className="arena-podium-meta">
-                        {dp.bois} bois • {fmt(dp.tempo)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
           </div>
         )}
       </div>
 
-      <div className="arena-ranking">
-        <div className="arena-ranking-header">🏆 TOP 10 RANKING 🏆</div>
+      {/* Ranking sempre fixo na base — quando encerrada mostra pódio acima das linhas */}
+      <div className={`arena-ranking${provaEncerrada && top3.length > 0 ? " arena-ranking-final" : ""}`}>
+        {provaEncerrada && top3.length > 0 ? (
+          <div className="arena-podium-inline">
+            <div className="arena-podium-title">🏆 Resultado Final 🏆</div>
+            <div className="arena-podium-grid-inline">
+              {top3.map((dp, index) => (
+                <div key={dp.id} className="arena-podium-card-inline">
+                  <span className="arena-podium-medal-inline">{medalhas[index]}</span>
+                  <span className="arena-podium-name-inline" title={`${dp.cavaleiro1} & ${dp.cavaleiro2}`}>
+                    {dp.cavaleiro1} & {dp.cavaleiro2}
+                  </span>
+                  <span className="arena-podium-meta-inline">{dp.bois} bois · {fmt(dp.tempo)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="arena-ranking-header">🏆 TOP 10 RANKING 🏆</div>
+        )}
         <div className="arena-ranking-list">
           {top10.length === 0 ? (
             <div className="arena-ranking-empty">Nenhum resultado registrado</div>
@@ -144,16 +143,10 @@ export default function ArenaScreen({
               >
                 <div className="arena-rank-position">{i < 3 ? medalhas[i] : i + 1}</div>
                 <div className="arena-rank-team">
-                  <div
-                    className="arena-rank-name"
-                    title={`${dp.cavaleiro1} & ${dp.cavaleiro2}`}
-                  >
+                  <div className="arena-rank-name" title={`${dp.cavaleiro1} & ${dp.cavaleiro2}`}>
                     {dp.cavaleiro1} & {dp.cavaleiro2}
                   </div>
-                  <div
-                    className="arena-rank-horses"
-                    title={`${dp.cavalo1} • ${dp.cavalo2}`}
-                  >
+                  <div className="arena-rank-horses" title={`${dp.cavalo1} • ${dp.cavalo2}`}>
                     🐴 {dp.cavalo1} • {dp.cavalo2}
                   </div>
                 </div>
@@ -306,52 +299,28 @@ export default function ArenaScreen({
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
 
-        /* ── CONCLUÍDO / PÓDIO ────────────────────────────── */
+        /* ── CONCLUÍDO ────────────────────────────────────── */
         .arena-complete-stack {
           display: flex; flex-direction: column;
-          gap: clamp(10px, 2vh, 24px);
         }
-        .arena-podium {
-          background: linear-gradient(135deg, #141000 0%, #1C1800 100%);
-          border: 2px solid #F4C542; border-radius: 16px;
-          padding: clamp(14px, 2vw, 28px);
-        }
-        .arena-podium-title {
-          font-size: clamp(18px, 2.2vw, 38px);
-          font-weight: 700; color: #F4C542;
-          text-align: center; text-transform: uppercase;
-          letter-spacing: 2px; margin-bottom: clamp(10px, 2vh, 22px);
-        }
-        .arena-podium-grid {
-          display: grid; grid-template-columns: repeat(3,1fr);
-          gap: clamp(8px, 1.5vw, 16px);
-        }
-        .arena-podium-card {
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(244,197,66,0.2);
-          border-radius: 12px;
-          padding: clamp(10px, 1.5vw, 20px) clamp(8px, 1vw, 16px);
-          text-align: center;
-        }
-        .arena-podium-medal { font-size: clamp(22px, 2.5vw, 44px); margin-bottom: 8px; }
-        .arena-podium-name {
-          font-size: clamp(13px, 1.4vw, 22px);
-          font-weight: 700; color: #F0F0F0;
-          margin-bottom: 6px; line-height: 1.2; overflow-wrap: break-word;
-        }
-        .arena-podium-meta { font-size: clamp(11px, 1vw, 15px); color: #C98A2E; }
 
         /* ── RANKING ──────────────────────────────────────── */
         .arena-ranking {
           background: linear-gradient(180deg, #111111 0%, #0B0B0B 100%);
           border-top: 3px solid #F4C542;
           padding: clamp(6px, 1vh, 14px) clamp(12px, 3vw, 32px) clamp(8px, 1.2vh, 16px);
-          /* altura fixa: nunca cresce e nunca empurra o timer */
+          /* altura fixa durante a prova — nunca empurra o timer */
           flex: 0 0 auto;
           height: clamp(160px, 30vh, 340px);
           display: flex;
           flex-direction: column;
           min-height: 0;
+        }
+        /* quando a prova está encerrada ocupa todo o espaço restante */
+        .arena-ranking.arena-ranking-final {
+          flex: 1;
+          height: auto;
+          max-height: none;
         }
         .arena-ranking-header {
           font-size: clamp(11px, 1.4vw, 24px);
@@ -361,7 +330,6 @@ export default function ArenaScreen({
           flex-shrink: 0;
         }
         .arena-ranking-list {
-          /* 2 colunas em telas largas, 1 coluna em mobile */
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
           gap: clamp(3px, 0.5vh, 6px) clamp(8px, 1.5vw, 20px);
@@ -373,6 +341,45 @@ export default function ArenaScreen({
         .arena-ranking-empty {
           text-align: center; color: #555;
           font-size: clamp(13px, 1.5vw, 18px); padding: 16px;
+        }
+
+        /* ── PÓDIO INLINE (estado encerrado) ──────────────── */
+        .arena-podium-inline {
+          flex-shrink: 0;
+          margin-bottom: clamp(6px, 1vh, 12px);
+        }
+        .arena-podium-title {
+          font-size: clamp(13px, 1.6vw, 26px);
+          font-weight: 700; color: #F4C542;
+          text-align: center; text-transform: uppercase;
+          letter-spacing: 2px; margin-bottom: clamp(4px, 0.8vh, 10px);
+        }
+        .arena-podium-grid-inline {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: clamp(6px, 1vw, 14px);
+          max-width: 1600px; margin: 0 auto;
+        }
+        .arena-podium-card-inline {
+          background: linear-gradient(135deg, #141000 0%, #1C1800 100%);
+          border: 1px solid rgba(244,197,66,0.3);
+          border-radius: 10px;
+          padding: clamp(6px, 1vh, 12px) clamp(8px, 1.2vw, 16px);
+          display: flex; align-items: center; gap: clamp(6px, 1vw, 12px);
+          min-width: 0;
+        }
+        .arena-podium-medal-inline {
+          font-size: clamp(18px, 2vw, 34px);
+          flex-shrink: 0;
+        }
+        .arena-podium-name-inline {
+          font-size: clamp(12px, 1.3vw, 20px);
+          font-weight: 700; color: #F0F0F0; flex: 1;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .arena-podium-meta-inline {
+          font-size: clamp(10px, 0.9vw, 15px);
+          color: #C98A2E; flex-shrink: 0; white-space: nowrap;
         }
         .arena-rank-row {
           display: grid;
@@ -439,8 +446,10 @@ export default function ArenaScreen({
           .arena-timer { font-size: clamp(48px, 18vw, 96px); letter-spacing: -2px; }
           .arena-competitors-wrapper { grid-template-columns: 1fr; gap: 10px; }
           .arena-next { padding: 12px 14px; border-radius: 12px; }
-          .arena-podium-grid { grid-template-columns: 1fr; gap: 8px; }
+          .arena-podium-grid-inline { grid-template-columns: 1fr; gap: 6px; }
+          .arena-podium-card-inline { flex-direction: column; align-items: flex-start; gap: 4px; }
           .arena-ranking { padding: 6px 12px 8px; height: clamp(140px, 28vh, 260px); }
+          .arena-ranking.arena-ranking-final { height: auto; }
           .arena-ranking-list { grid-template-columns: 1fr; }
           .arena-rank-row { grid-template-columns: 32px 1fr auto; gap: 6px; padding: 5px 8px; }
         }
@@ -450,6 +459,7 @@ export default function ArenaScreen({
           .arena-timer { font-size: clamp(140px, 12vw, 220px); }
           .arena-next-riders { font-size: clamp(40px, 3vw, 72px); }
           .arena-ranking { padding: 16px 48px 20px; height: clamp(180px, 28vh, 320px); }
+          .arena-ranking.arena-ranking-final { height: auto; padding: 20px 48px; }
           .arena-rank-row { padding: 10px 20px; border-radius: 14px; }
         }
       `}</style>
