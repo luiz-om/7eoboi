@@ -13,7 +13,7 @@ export default function ArenaScreen({
   useEffect(() => {
     const timer = setTimeout(() => {
       const novasAnimacoes = new Set();
-      ranking.slice(0, 5).forEach((_, i) => novasAnimacoes.add(i));
+      ranking.slice(0, 10).forEach((_, i) => novasAnimacoes.add(i));
       setAnimacoes(novasAnimacoes);
     }, 100);
     return () => clearTimeout(timer);
@@ -22,7 +22,7 @@ export default function ArenaScreen({
   const proximaDupla = duplas.find((d) => d.status === "PENDENTE");
   const pendentes = duplas.filter((d) => d.status === "PENDENTE");
   const proximaDupla2 = pendentes[1] ?? null;
-  const top5 = ranking.slice(0, 5);
+  const top10 = ranking.slice(0, 10);
   const top3 = ranking.slice(0, 3);
   const medalhas = ["🥇", "🥈", "🥉"];
   const temPendentes = duplas.some((d) => d.status === "PENDENTE");
@@ -131,16 +131,16 @@ export default function ArenaScreen({
       </div>
 
       <div className="arena-ranking">
-        <div className="arena-ranking-header">🏆 TOP 5 RANKING 🏆</div>
+        <div className="arena-ranking-header">🏆 TOP 10 RANKING 🏆</div>
         <div className="arena-ranking-list">
-          {top5.length === 0 ? (
+          {top10.length === 0 ? (
             <div className="arena-ranking-empty">Nenhum resultado registrado</div>
           ) : (
-            top5.map((dp, i) => (
+            top10.map((dp, i) => (
               <div
                 key={dp.id}
                 className={`arena-rank-row ${animacoes.has(i) ? "arena-rank-animated" : ""}`}
-                style={{ animationDelay: animacoes.has(i) ? `${i * 0.1}s` : "0s" }}
+                style={{ animationDelay: animacoes.has(i) ? `${i * 0.08}s` : "0s" }}
               >
                 <div className="arena-rank-position">{i < 3 ? medalhas[i] : i + 1}</div>
                 <div className="arena-rank-team">
@@ -345,24 +345,29 @@ export default function ArenaScreen({
         .arena-ranking {
           background: linear-gradient(180deg, #111111 0%, #0B0B0B 100%);
           border-top: 3px solid #F4C542;
-          padding: clamp(6px, 1vh, 16px) clamp(12px, 3vw, 32px) clamp(8px, 1.5vh, 18px);
-          flex-shrink: 0;
-          max-height: 38vh;
+          padding: clamp(6px, 1vh, 14px) clamp(12px, 3vw, 32px) clamp(8px, 1.2vh, 16px);
+          /* altura fixa: nunca cresce e nunca empurra o timer */
+          flex: 0 0 auto;
+          height: clamp(160px, 30vh, 340px);
           display: flex;
           flex-direction: column;
           min-height: 0;
         }
         .arena-ranking-header {
-          font-size: clamp(12px, 1.6vw, 26px);
+          font-size: clamp(11px, 1.4vw, 24px);
           font-weight: 700; color: #F4C542;
           text-align: center; text-transform: uppercase;
-          letter-spacing: 2px; margin-bottom: clamp(4px, 0.8vh, 10px);
+          letter-spacing: 2px; margin-bottom: clamp(4px, 0.6vh, 8px);
           flex-shrink: 0;
         }
         .arena-ranking-list {
-          display: grid; gap: clamp(3px, 0.6vh, 7px);
+          /* 2 colunas em telas largas, 1 coluna em mobile */
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+          gap: clamp(3px, 0.5vh, 6px) clamp(8px, 1.5vw, 20px);
           max-width: 1600px; margin: 0 auto; width: 100%;
           overflow-y: auto;
+          align-content: start;
           flex: 1; min-height: 0;
         }
         .arena-ranking-empty {
@@ -435,16 +440,17 @@ export default function ArenaScreen({
           .arena-competitors-wrapper { grid-template-columns: 1fr; gap: 10px; }
           .arena-next { padding: 12px 14px; border-radius: 12px; }
           .arena-podium-grid { grid-template-columns: 1fr; gap: 8px; }
-          .arena-ranking { padding: 6px 12px 10px; max-height: 40vh; }
-          .arena-rank-row { grid-template-columns: 32px 1fr auto; gap: 6px; padding: 6px 8px; }
+          .arena-ranking { padding: 6px 12px 8px; height: clamp(140px, 28vh, 260px); }
+          .arena-ranking-list { grid-template-columns: 1fr; }
+          .arena-rank-row { grid-template-columns: 32px 1fr auto; gap: 6px; padding: 5px 8px; }
         }
 
         /* ── TV GRANDE (≥1920px) ──────────────────────────── */
         @media (min-width: 1920px) {
           .arena-timer { font-size: clamp(140px, 12vw, 220px); }
           .arena-next-riders { font-size: clamp(40px, 3vw, 72px); }
-          .arena-ranking { padding: 20px 48px 24px; max-height: 35vh; }
-          .arena-rank-row { padding: 14px 24px; border-radius: 14px; }
+          .arena-ranking { padding: 16px 48px 20px; height: clamp(180px, 28vh, 320px); }
+          .arena-rank-row { padding: 10px 20px; border-radius: 14px; }
         }
       `}</style>
     </div>
