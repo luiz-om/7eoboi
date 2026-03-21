@@ -60,6 +60,7 @@ export default function RanchSortingApp() {
   const [timerRodando, setTimerRodando] = useState(false);
   const [tempoInicial, setTempoInicial] = useState(null);
   const [boisTelao, setBoisTelao] = useState("");
+  const [boisErro, setBoisErro] = useState(false);
   const canalTelaoRef = useRef(null);
 
   useEffect(() => {
@@ -539,6 +540,7 @@ export default function RanchSortingApp() {
       toast(`Dupla marcada como SAT: ${atual.cavaleiro1}`);
       setTempoTelao("00.000");
       setBoisTelao("");
+      setBoisErro(false);
     } catch (error) {
       toast(error.message || "Nao foi possivel marcar SAT.", "erro");
     }
@@ -547,9 +549,9 @@ export default function RanchSortingApp() {
   async function finalizarDuplaAtual() {
     const atual = duplas.find(d => !duplaConcluida(d));
     if (!atual) { toast("Nenhuma dupla pendente!", "erro"); return; }
-    if (boisTelao === "") { toast("Digite o número de bois!", "erro"); return; }
+    if (boisTelao === "") { setBoisErro(true); toast("Digite o número de bois!", "erro"); return; }
     const bois = parseInt(boisTelao);
-    if (isNaN(bois) || bois < 0 || bois > 10) { toast("Bois devem ser entre 0 e 10!", "erro"); return; }
+    if (isNaN(bois) || bois < 0 || bois > 10) { setBoisErro(true); toast("Bois devem ser entre 0 e 10!", "erro"); return; }
     const [segundos, milisegundos] = tempoTelao.split(".").map(Number);
     const tempoEmSegundos = (segundos || 0) + ((milisegundos || 0) / 1000);
 
@@ -562,6 +564,7 @@ export default function RanchSortingApp() {
       toast(`Dupla finalizada: ${atual.cavaleiro1} - ${bois} bois`);
       setTempoTelao("00.000");
       setBoisTelao("");
+      setBoisErro(false);
     } catch (error) {
       toast(error.message || "Nao foi possivel finalizar a dupla.", "erro");
     }
@@ -857,7 +860,7 @@ export default function RanchSortingApp() {
   }
 
   if (isTelaoWindow) {
-    return <ArenaScreen duplas={duplas} ranking={ranking} tempo={tempoTelao} nomeProva={provaAtual?.nome || "Ranch Sorting"} provaFinalizada={provaFinalizada} />;
+    return <ArenaScreen duplas={duplas} ranking={ranking} tempo={tempoTelao} timerRodando={timerRodando} nomeProva={provaAtual?.nome || "Ranch Sorting"} provaFinalizada={provaFinalizada} />;
   }
 
   const tabs = [
@@ -1420,7 +1423,7 @@ export default function RanchSortingApp() {
 
               <div style={{ marginBottom: "14px", display: "grid", gridTemplateColumns: "2fr 1fr", gap: "10px" }}>
                 <Input label="⏱️ Ajustar Tempo (SS.mmm)" value={tempoTelao} onChange={e => { const v = e.target.value.replace(",", "."); if (v === "" || /^\d{0,2}([.,]\d{0,3})?$/.test(v)) { setTempoTelao(v || "00.000"); setTimerRodando(false); } }} placeholder="00.000" disabled={timerRodando} />
-                <Input label="🐄 Bois (0-10)" value={boisTelao} onChange={e => { const v = e.target.value; if (v === "" || /^\d{0,2}$/.test(v)) { const num = parseInt(v); if (v === "" || (num >= 0 && num <= 10)) setBoisTelao(v); } }} placeholder="0" disabled={timerRodando} type="number" />
+                <Input label="🐄 Bois (0-10)" value={boisTelao} onChange={e => { const v = e.target.value; if (v === "" || /^\d{0,2}$/.test(v)) { const num = parseInt(v); if (v === "" || (num >= 0 && num <= 10)) { setBoisTelao(v); setBoisErro(false); } } }} placeholder="0" disabled={timerRodando} type="number" style={boisErro ? { borderColor: "#ef4444", boxShadow: "0 0 0 2px rgba(239,68,68,0.25)" } : {}} />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
