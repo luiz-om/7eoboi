@@ -1,73 +1,51 @@
-# React + TypeScript + Vite
+# Ranch Sorting
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Sistema de gerenciamento de provas de Ranch Sorting com:
 
-Currently, two official plugins are available:
+- autenticacao via Supabase
+- cadastro de provas e duplas
+- registro de resultados
+- ranking em tempo real
+- telao em janela separada
+- exportacao de ranking e certificados
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Documentacao
 
-## React Compiler
+A documentacao tecnica e funcional completa esta em:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- [DOCUMENTACAO_SISTEMA.md](/Users/luizom/Documents/Projetos/7Eoboi/DOCUMENTACAO_SISTEMA.md)
 
-## Expanding the ESLint configuration
+## Comandos
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- `npm run dev`
+- `npm run build`
+- `npm run lint`
+- `npm test`
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Variaveis de ambiente
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Roteiro de demonstracao (demo)
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+1. **Criar prova** — aba _Provas_ → botão _Nova Prova_ → preencher nome e salvar
+2. **Cadastrar duplas** — aba _Duplas_ → adicionar pelo menos 3 duplas com nomes e cavalos
+3. **Abrir Telão** — botão _🖥 Telão_ no cabeçalho (ou aba _Controle_) → abre em nova janela
+4. **Iniciar cronômetro** — aba _Controle_ → clicar _▶ Iniciar_ → observar **● AO VIVO** piscando no telão e o contador correndo
+5. **Parar cronômetro** — clicar _⏸ Parar_ → AO VIVO some, tempo fica congelado no telão
+6. **Finalizar dupla** — digitar número de bois (0–10) e clicar _✅ Finalizar Dupla_ → ranking atualiza no telão
+7. **Testar SAT** — iniciar timer para a próxima dupla e clicar _SAT_ → dupla marcada, telão avança
+8. **Erro de validação** — clicar _✅ Finalizar_ sem digitar bois → campo fica vermelho com destaque
+9. **Verificar ranking** — aba _Ranking_ → top 5 aparece no telão em tempo real
+10. **Exportar CSV** — aba _Ranking_ → botão _Exportar CSV_
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Dicas para a apresentacao
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- Deixe a janela do telão num monitor externo ou projetor (tela cheia com F11)
+- O telão atualiza sozinho via BroadcastChannel — sem necessidade de recarregar
+- Fontes e layout se adaptam automaticamente de notebook (768 px) a TV 4K (1920 px)
+
+Referencia:
+
+- [.env.example](/Users/luizom/Documents/Projetos/7Eoboi/.env.example)
