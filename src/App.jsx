@@ -1414,7 +1414,7 @@ export default function RanchSortingApp() {
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "14px" }}>
-                <Btn variant="success" size="lg" full onClick={() => { if (!timerRodando) { setTempoTelao("00.000"); setTempoInicial(null); setTimerRodando(true); } }} disabled={timerRodando} style={{ opacity: timerRodando ? 0.5 : 1, cursor: timerRodando ? "not-allowed" : "pointer" }}>▶️ Iniciar</Btn>
+                <Btn variant="success" size="lg" full onClick={() => { if (!timerRodando) { setTempoTelao("00.000"); setTempoInicial(null); setTimerRodando(true); } }} disabled={timerRodando || !proximaDupla} style={{ opacity: (timerRodando || !proximaDupla) ? 0.5 : 1, cursor: (timerRodando || !proximaDupla) ? "not-allowed" : "pointer" }}>▶️ Iniciar</Btn>
                 <Btn variant="danger" size="lg" full onClick={() => setTimerRodando(false)} disabled={!timerRodando} style={{ opacity: !timerRodando ? 0.5 : 1, cursor: !timerRodando ? "not-allowed" : "pointer" }}>⏸️ Parar</Btn>
               </div>
 
@@ -1426,7 +1426,7 @@ export default function RanchSortingApp() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
                 <Btn variant="success" size="lg" full onClick={abrirTelao} style={{ fontSize: "14px" }}>🪟 Abrir Telão</Btn>
                 <Btn variant="amber" size="lg" full onClick={finalizarDuplaAtual} style={{ fontSize: "14px" }}>✅ Finalizar Dupla</Btn>
-                <Btn variant="danger" size="lg" full onClick={registrarSAT} style={{ fontSize: "14px" }}>SAT</Btn>
+                <Btn variant="danger" size="lg" full onClick={registrarSAT} disabled={!timerRodando && tempoTelao === "00.000"} style={{ fontSize: "14px", opacity: (!timerRodando && tempoTelao === "00.000") ? 0.5 : 1, cursor: (!timerRodando && tempoTelao === "00.000") ? "not-allowed" : "pointer" }}>SAT</Btn>
               </div>
             </div>
 
