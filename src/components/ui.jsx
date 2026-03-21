@@ -266,3 +266,70 @@ export function EmptyState({ title, text, icon = "🐄" }) {
     </div>
   );
 }
+
+export function ConfirmDialog({
+  open,
+  title,
+  text,
+  confirmLabel = "Confirmar",
+  cancelLabel = "Cancelar",
+  confirmVariant = "danger",
+  loading = false,
+  onConfirm,
+  onCancel,
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0, 0, 0, 0.72)",
+        backdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px",
+        zIndex: 1200,
+      }}
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: "420px",
+          background: "#171717",
+          border: "1px solid #2A2A2A",
+          borderRadius: "18px",
+          boxShadow: "0 24px 60px rgba(0,0,0,0.45)",
+          padding: "22px",
+        }}
+      >
+        <div
+          style={{
+            fontFamily: "'Oswald',sans-serif",
+            fontSize: "22px",
+            color: "#F4C542",
+            textTransform: "uppercase",
+            letterSpacing: "1px",
+          }}
+        >
+          {title}
+        </div>
+        <div style={{ marginTop: "10px", color: "#B5B0A6", fontSize: "14px", lineHeight: 1.6 }}>
+          {text}
+        </div>
+        <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "22px" }}>
+          <Btn variant="ghost" size="md" onClick={onCancel} disabled={loading}>
+            {cancelLabel}
+          </Btn>
+          <Btn variant={confirmVariant} size="md" onClick={onConfirm} disabled={loading}>
+            {loading ? "Processando..." : confirmLabel}
+          </Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
