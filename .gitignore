@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Variaveis de ambiente (contem chaves sensiveis)
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.staging
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -22,3 +30,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Documentacao interna / instrucoes (nao subir no repositorio)
+ADVANCED_EXAMPLES.md
+ARENA_SCREEN_CHECKLIST.md
+ARENA_SCREEN_GUIDE.md
+DOCUMENTACAO_SISTEMA.md
+IMPLEMENTATION_SUMMARY.md
+INTEGRATION_STEPS.md
+README_ARENA_SCREEN.md
+TELAO_IMPLEMENTACAO.md
+TELAO_NOVA_JANELA.md
+TELAO_RAPIDO.md
+TELAO_RESUMO.md
+TELAO_SUMARIO.md
+VISUAL_ARCHITECTURE.md
+*.instructions.md
+*.copilot.md
