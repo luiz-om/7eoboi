@@ -7,6 +7,10 @@ export default function ArenaScreen({
   timerRodando = false,
   nomeProva = "Ranch Sorting",
   provaFinalizada = false,
+  boiAtual = null,
+  contadorBois = 0,
+  tempoFinalizado = false,
+  boisFinalizados = 0,
 }) {
   const [animacoes, setAnimacoes] = useState(new Set());
 
@@ -72,10 +76,19 @@ export default function ArenaScreen({
         <>
           <div className="arena-main">
             <div className="arena-timer-container">
-              <div className={`arena-timer${timerRodando ? " arena-timer-running" : ""}`}>{tempo}</div>
+              <div className="arena-timer-row">
+                <div className={`arena-timer${timerRodando ? " arena-timer-running" : tempoFinalizado ? " arena-timer-finalizado" : ""}`}>{tempo}</div>
+                {(boiAtual !== null || tempoFinalizado) && (
+                  <div className={`arena-boi-inline${tempoFinalizado ? " arena-boi-finalizado" : ""}`}>
+                    {tempoFinalizado ? boisFinalizados : boiAtual}
+                  </div>
+                )}
+              </div>
               <div className="arena-timer-label">
                 {timerRodando ? (
                   <span className="arena-live-badge">● AO VIVO</span>
+                ) : tempoFinalizado ? (
+                  <span className="arena-resultado-badge">✔ TEMPO FINAL &nbsp;·&nbsp; {boisFinalizados} {boisFinalizados === 1 ? "BOI" : "BOIS"}</span>
                 ) : "TEMPO"}
               </div>
             </div>
@@ -218,6 +231,12 @@ export default function ArenaScreen({
           margin-bottom: clamp(8px, 2vh, 28px);
           flex-shrink: 0;
         }
+        .arena-timer-row {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: clamp(16px, 3vw, 56px);
+        }
         .arena-timer {
           font-size: clamp(52px, 13vw, 180px);
           font-family: 'Courier New', monospace;
@@ -229,6 +248,37 @@ export default function ArenaScreen({
         .arena-timer-running {
           text-shadow: 0 0 60px rgba(34,197,94,0.7), 0 0 20px rgba(34,197,94,0.5);
         }
+        /* Cronômetro congelado no tempo final */
+        .arena-timer-finalizado {
+          color: #F4C542;
+          text-shadow: 0 0 60px rgba(244,197,66,0.6), 0 0 20px rgba(244,197,66,0.4);
+          animation: pulseResult 1.4s ease-in-out infinite;
+        }
+        /* Bloco do boi: mesma altura visual do cronômetro */
+        .arena-boi-inline {
+          font-size: clamp(52px, 13vw, 180px);
+          font-family: 'Oswald', sans-serif;
+          font-weight: 900;
+          color: #F4C542;
+          line-height: 0.9;
+          letter-spacing: -2px;
+          text-shadow: 0 0 40px rgba(244,197,66,0.55);
+          background: linear-gradient(160deg, #1A1000 0%, #2A1800 100%);
+          border: 3px solid #F4C542;
+          border-radius: clamp(10px, 1.5vw, 20px);
+          padding: clamp(4px, 1vw, 14px) clamp(14px, 2.5vw, 44px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-width: clamp(70px, 10vw, 180px);
+        }
+        /* Bloco do boi no estado finalizado — destaque especial */
+        .arena-boi-finalizado {
+          border-color: #F4C542;
+          background: linear-gradient(160deg, #2A1800 0%, #3A2200 100%);
+          box-shadow: 0 0 40px rgba(244,197,66,0.35);
+          animation: pulseResult 1.4s ease-in-out infinite;
+        }
         .arena-timer-label {
           font-size: clamp(11px, 1.5vw, 22px);
           color: #666; letter-spacing: 4px;
@@ -238,6 +288,12 @@ export default function ArenaScreen({
           color: #22C55E;
           letter-spacing: 3px;
           animation: pulseLive 1s ease-in-out infinite;
+        }
+        .arena-resultado-badge {
+          color: #F4C542;
+          letter-spacing: 3px;
+          font-weight: 700;
+          font-size: clamp(13px, 1.8vw, 28px);
         }
 
         /* ── DUPLAS ───────────────────────────────────────── */
@@ -442,6 +498,10 @@ export default function ArenaScreen({
         @keyframes pulseLive {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.35; }
+        }
+        @keyframes pulseResult {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.7; }
         }
 
         /* ── TABLET (768px – 1279px) ──────────────────────── */

@@ -63,6 +63,21 @@ export default function RanchSortingApp() {
   const [boisErro, setBoisErro] = useState(false);
   const canalTelaoRef = useRef(null);
 
+  // --- Sorteio de Bois ---
+  const TODOS_BOIS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const [boisDisponiveis, setBoisDisponiveis] = useState([...TODOS_BOIS]);
+  const [boisUsados, setBoisUsados] = useState([]);
+  const [boiAtual, setBoiAtual] = useState(null);
+  const [contadorBois, setContadorBois] = useState(0);
+  const [rodadaIniciada, setRodadaIniciada] = useState(false);
+  const [parciais, setParciais] = useState([]);
+  const tempoInicialBoiRef = useRef(null);
+  const tempoTelaoRef = useRef("00.000"); // espelha tempoTelao para leitura síncrona
+  const tempoFinalFixadoRef = useRef(null); // quando setado, o intervalo retorna esse valor fixo
+
+  // Mantém a ref sempre atualizada
+  useEffect(() => { tempoTelaoRef.current = tempoTelao; }, [tempoTelao]);
+
   useEffect(() => {
     if (isTelaoWindow || !timerRodando) {
       setTempoInicial(null);
@@ -73,6 +88,8 @@ export default function RanchSortingApp() {
     }
     const interval = setInterval(() => {
       setTempoTelao(() => {
+        // Se o tempo foi fixado (encerramento de rodada), congela o display nesse valor
+        if (tempoFinalFixadoRef.current !== null) return tempoFinalFixadoRef.current;
         const agora = Date.now();
         const tempoDecorrido = agora - (tempoInicial || agora);
         const totalMilisegundos = Math.floor(tempoDecorrido);
@@ -292,6 +309,9 @@ export default function RanchSortingApp() {
       if (event.data?.type !== "timer-sync") return;
       if (typeof event.data.tempo === "string") setTempoTelao(event.data.tempo);
       if (typeof event.data.timerRodando === "boolean") setTimerRodando(event.data.timerRodando);
+      if (typeof event.data.boiAtual === "number" || event.data.boiAtual === null) setBoiAtual(event.data.boiAtual);
+      if (typeof event.data.contadorBois === "number") setContadorBois(event.data.contadorBois);
+      if (typeof event.data.boisTelao === "string") setBoisTelao(event.data.boisTelao);
     };
 
     return () => {
@@ -306,8 +326,104 @@ export default function RanchSortingApp() {
       type: "timer-sync",
       tempo: tempoTelao,
       timerRodando,
+      boiAtual,
+      contadorBois,
+      boisTelao,
     });
-  }, [isTelaoWindow, tempoTelao, timerRodando]);
+  }, [isTelaoWindow, tempoTelao, timerRodando, boiAtual, contadorBois, boisTelao]);
+
+  // ---- Lógica de Sorteio de Bois ----
+
+  // Gera sequência circular a partir de `inicio`: ex boi 6 → [6,7,8,9,0,1,2,3,4,5]
+  function sequenciaCircular(inicio) {
+    const seq = [];
+    for (let i = 0; i < 10; i++) seq.push((inicio + i) % 10);
+    return seq;
+  }
+
+  function resetarRodada() {
+    tempoFinalFixadoRef.current = null;
+    setRodadaIniciada(false);
+    setBoiAtual(null);
+    setContadorBois(0);
+    setBoisDisponiveis([...TODOS_BOIS]);
+    setBoisUsados([]);
+    setParciais([]);
+    tempoInicialBoiRef.current = null;
+    setTimerRodando(false);
+    setTempoInicial(null);
+    setTempoTelao("00.000");
+  }
+
+  function iniciarRodada() {
+    // Sorteia o boi inicial aleatoriamente
+    const idx = Math.floor(Math.random() * 10);
+    const boiInicial = TODOS_BOIS[idx];
+    // Sequência circular a partir do boi sorteado
+    const seq = sequenciaCircular(boiInicial);
+    // Disponíveis = resto da sequência (sem o primeiro)
+    setBoisDisponiveis(seq.slice(1));
+    setBoisUsados([boiInicial]);
+    setBoiAtual(boiInicial);
+    setContadorBois(1);
+    setParciais([]);
+    setRodadaIniciada(true);
+    tempoInicialBoiRef.current = Date.now();
+    setTempoTelao("00.000");
+    setTempoInicial(null);
+    setTimerRodando(true);
+  }
+
+  function proximoBoi() {
+    if (!rodadaIniciada) return;
+    // Grava o tempo do cronômetro AGORA como tempo deste boi
+    const tempoNesteClique = tempoTelaoRef.current;
+    const novasParciais = [...parciais, { boi: boiAtual, tempo: tempoNesteClique }];
+    setParciais(novasParciais);
+
+    // Próximo boi é sempre o primeiro da fila circular (sem aleatoriedade)
+    if (novasParciais.length >= 10 || boisDisponiveis.length === 0) {
+      encerrarRodadaComBois(novasParciais);
+      return;
+    }
+    const novoBoi = boisDisponiveis[0];
+    const novaFila = boisDisponiveis.slice(1);
+    setBoisDisponiveis(novaFila);
+    setBoisUsados(prev => [...prev, novoBoi]);
+    setBoiAtual(novoBoi);
+    setContadorBois(prev => prev + 1);
+    tempoInicialBoiRef.current = Date.now();
+  }
+
+  function encerrarRodadaComBois(parciaisFinais) {
+    const totalBois = parciaisFinais.length;
+    // Tempo final = último tempo gravado no parcial (tempo exato quando o último boi passou)
+    const ultimoParcial = parciaisFinais[parciaisFinais.length - 1];
+    const tempoFinalStr = ultimoParcial ? ultimoParcial.tempo : tempoTelaoRef.current;
+    // Fixa o display ANTES de parar o timer para evitar tick extra do intervalo
+    tempoFinalFixadoRef.current = tempoFinalStr;
+    setTimerRodando(false);
+    setRodadaIniciada(false);
+    setTempoTelao(tempoFinalStr);
+    setBoisTelao(String(totalBois));
+    // Limpa o travamento após o estado ser aplicado
+    setTimeout(() => { tempoFinalFixadoRef.current = null; }, 100);
+    toast(`Rodada encerrada: ${totalBois} bois em ${tempoFinalStr}s`);
+  }
+
+  // Gatekeeper de 60s — interrompe a rodada automaticamente
+  useEffect(() => {
+    if (!timerRodando || !rodadaIniciada) return;
+    const [seg] = tempoTelao.split(".").map(Number);
+    if ((seg || 0) >= 60) {
+      // Tempo expirou: o boi atual NÃO passou, não conta.
+      // Usa apenas os parciais já confirmados (cliques em "Próximo Boi").
+      // O tempo final é o do último parcial confirmado.
+      encerrarRodadaComBois(parciais);
+    }
+  }, [tempoTelao, timerRodando, rodadaIniciada]);
+
+  // ---- fim lógica de bois ----
 
   function resetarFormProva() {
     setProvaForm({ nome: "", local: "", data: new Date().toISOString().slice(0, 10), observacoes: "" });
@@ -548,7 +664,7 @@ export default function RanchSortingApp() {
       await updateResultadoDupla(atual.id, { status: "SAT", bois: null, tempo: tempoEmSegundos });
       await carregarDados(provaAtual.id);
       toast(`Dupla marcada como SAT: ${atual.cavaleiro1}`);
-      setTempoTelao("00.000");
+      resetarRodada();
       setBoisTelao("");
       setBoisErro(false);
     } catch (error) {
@@ -559,20 +675,23 @@ export default function RanchSortingApp() {
   async function finalizarDuplaAtual() {
     const atual = duplas.find(d => !duplaConcluida(d));
     if (!atual) { toast("Nenhuma dupla pendente!", "erro"); return; }
-    if (boisTelao === "") { setBoisErro(true); toast("Digite o número de bois!", "erro"); return; }
-    const bois = parseInt(boisTelao);
-    if (isNaN(bois) || bois < 0 || bois > 10) { setBoisErro(true); toast("Bois devem ser entre 0 e 10!", "erro"); return; }
-    const [segundos, milisegundos] = tempoTelao.split(".").map(Number);
+    // Usa contadorBois da rodada se disponível, senão cai no campo manual
+    const boisFinais = rodadaIniciada ? contadorBois : parseInt(boisTelao);
+    if (!rodadaIniciada && boisTelao === "") { setBoisErro(true); toast("Inicie a rodada ou digite o número de bois!", "erro"); return; }
+    if (!rodadaIniciada && (isNaN(boisFinais) || boisFinais < 0 || boisFinais > 10)) { setBoisErro(true); toast("Bois devem ser entre 0 e 10!", "erro"); return; }
+
+    // Tempo final: se há parciais, usa o ÚLTIMO tempo gravado (tempo do cronômetro quando o último boi passou)
+    // Se não há parciais (rodada manual), usa tempoTelao normal
+    const ultimoParcial = parciais[parciais.length - 1];
+    const tempoFinalStr = ultimoParcial ? ultimoParcial.tempo : tempoTelao;
+    const [segundos, milisegundos] = tempoFinalStr.split(".").map(Number);
     const tempoEmSegundos = (segundos || 0) + ((milisegundos || 0) / 1000);
 
-    setTimerRodando(false);
-    setTempoInicial(null);
-
     try {
-      await updateResultadoDupla(atual.id, { status: "VALIDO", bois, tempo: tempoEmSegundos });
+      await updateResultadoDupla(atual.id, { status: "VALIDO", bois: boisFinais, tempo: tempoEmSegundos });
       await carregarDados(provaAtual?.id || null);
-      toast(`Dupla finalizada: ${atual.cavaleiro1} - ${bois} bois`);
-      setTempoTelao("00.000");
+      toast(`Dupla finalizada: ${atual.cavaleiro1} — ${boisFinais} bois em ${tempoFinalStr}s`);
+      resetarRodada();
       setBoisTelao("");
       setBoisErro(false);
     } catch (error) {
@@ -870,7 +989,7 @@ export default function RanchSortingApp() {
   }
 
   if (isTelaoWindow) {
-    return <ArenaScreen duplas={duplas} ranking={ranking} tempo={tempoTelao} timerRodando={timerRodando} nomeProva={provaAtual?.nome || "Ranch Sorting"} provaFinalizada={provaFinalizada} />;
+    return <ArenaScreen duplas={duplas} ranking={ranking} tempo={tempoTelao} timerRodando={timerRodando} nomeProva={provaAtual?.nome || "Ranch Sorting"} provaFinalizada={provaFinalizada} boiAtual={boiAtual} contadorBois={contadorBois} tempoFinalizado={!timerRodando && tempoTelao !== "00.000" && parseInt(boisTelao) > 0} boisFinalizados={parseInt(boisTelao) || 0} />;
   }
 
   const tabs = [
@@ -1419,32 +1538,105 @@ export default function RanchSortingApp() {
             )}
 
             <div style={{ background: "#1E1E1E", borderRadius: "12px", padding: "20px", marginBottom: "16px", border: "1px solid #2A2A2A" }}>
-              <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: "13px", color: "#F4C542", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "16px" }}>⏱️ CONTROLE DE TIMER</div>
+              <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: "13px", color: "#F4C542", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "16px" }}>⏱️ CONTROLE DE PROVA</div>
 
-              <div style={{ background: "#0B0B0B", borderRadius: "12px", padding: "24px", textAlign: "center", marginBottom: "16px", border: `2px solid ${timerRodando ? "#EF4444" : "#F4C542"}`, transition: "all 0.3s ease" }}>
-                <div style={{ fontSize: "64px", fontWeight: 800, color: timerRodando ? "#EF4444" : "#22C55E", fontFamily: "'Courier New',monospace", letterSpacing: "-2px", marginBottom: "8px" }}>{tempoTelao}</div>
-                <div style={{ fontSize: "12px", color: timerRodando ? "#EF4444" : "#555", textTransform: "uppercase", letterSpacing: "1px", fontWeight: timerRodando ? 700 : 400 }}>{timerRodando ? "⏸️ RODANDO" : "Tempo atual"}</div>
+              {/* Cronômetro + Boi Atual */}
+              {(() => {
+                const tempoFinalizado = !timerRodando && tempoTelao !== "00.000" && parseInt(boisTelao) > 0;
+                const corTempo = timerRodando ? "#EF4444" : tempoFinalizado ? "#F4C542" : "#22C55E";
+                const bordaCor = timerRodando ? "#EF4444" : tempoFinalizado ? "#F4C542" : "#2A2A2A";
+                const label = timerRodando ? "● RODANDO" : tempoFinalizado ? `✔ TEMPO FINAL — ${boisTelao} BOIS` : "Aguardando";
+                const labelCor = timerRodando ? "#EF4444" : tempoFinalizado ? "#F4C542" : "#555";
+                return (
+                  <div style={{ background: "#0B0B0B", borderRadius: "12px", padding: "20px 24px", textAlign: "center", marginBottom: "12px", border: `2px solid ${bordaCor}`, transition: "border-color 0.3s ease", display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: "16px" }}>
+                    <div>
+                      <div style={{ fontSize: "64px", fontWeight: 800, color: corTempo, fontFamily: "'Courier New',monospace", letterSpacing: "-2px", lineHeight: 1 }}>{tempoTelao}</div>
+                      <div style={{ fontSize: "11px", color: labelCor, textTransform: "uppercase", letterSpacing: "1px", fontWeight: timerRodando || tempoFinalizado ? 700 : 400, marginTop: "6px" }}>{label}</div>
+                    </div>
+                    {(rodadaIniciada && boiAtual !== null) ? (
+                      <div style={{ background: "#1A1000", border: "2px solid #F4C542", borderRadius: "12px", padding: "10px 18px", textAlign: "center", minWidth: "80px" }}>
+                        <div style={{ fontSize: "11px", color: "#C98A2E", textTransform: "uppercase", letterSpacing: "1px", fontFamily: "'Oswald',sans-serif", marginBottom: "4px" }}>BOI</div>
+                        <div style={{ fontSize: "44px", fontWeight: 900, color: "#F4C542", fontFamily: "'Oswald',sans-serif", lineHeight: 1 }}>{boiAtual}</div>
+                        <div style={{ fontSize: "10px", color: "#666", marginTop: "4px" }}>{contadorBois}/10</div>
+                      </div>
+                    ) : tempoFinalizado ? (
+                      <div style={{ background: "#2A1800", border: "2px solid #F4C542", borderRadius: "12px", padding: "10px 18px", textAlign: "center", minWidth: "80px" }}>
+                        <div style={{ fontSize: "11px", color: "#C98A2E", textTransform: "uppercase", letterSpacing: "1px", fontFamily: "'Oswald',sans-serif", marginBottom: "4px" }}>BOIS</div>
+                        <div style={{ fontSize: "44px", fontWeight: 900, color: "#F4C542", fontFamily: "'Oswald',sans-serif", lineHeight: 1 }}>{boisTelao}</div>
+                      </div>
+                    ) : (
+                      <div style={{ background: "#111", border: "2px dashed #333", borderRadius: "12px", padding: "10px 18px", textAlign: "center", minWidth: "80px" }}>
+                        <div style={{ fontSize: "11px", color: "#444", textTransform: "uppercase", letterSpacing: "1px", fontFamily: "'Oswald',sans-serif", marginBottom: "4px" }}>BOI</div>
+                        <div style={{ fontSize: "36px", color: "#333", fontFamily: "'Oswald',sans-serif", lineHeight: 1 }}>—</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Bois usados / progresso — exibe na ordem circular */}
+              {rodadaIniciada && boiAtual !== null && (
+                <div style={{ background: "#111", borderRadius: "8px", padding: "10px 12px", marginBottom: "12px", display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+                  <span style={{ fontSize: "10px", color: "#555", textTransform: "uppercase", letterSpacing: "1px", marginRight: "4px" }}>Ordem:</span>
+                  {(() => {
+                    // Recalcula a sequência circular com base no primeiro boi da rodada
+                    const primeiroBoiDaRodada = boisUsados[0] ?? boiAtual;
+                    const seq = Array.from({ length: 10 }, (_, i) => (primeiroBoiDaRodada + i) % 10);
+                    return seq.map((b, i) => {
+                      const usado = boisUsados.includes(b) && b !== boiAtual;
+                      const atual = b === boiAtual;
+                      return (
+                        <span key={i} style={{ width: "28px", height: "28px", borderRadius: "6px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 700, fontFamily: "'Oswald',sans-serif", background: atual ? "#F4C542" : usado ? "#1A3A1A" : "#1E1E1E", color: atual ? "#000" : usado ? "#22C55E" : "#333", border: atual ? "2px solid #F4C542" : usado ? "1px solid #22C55E44" : "1px solid #2A2A2A", transition: "all 0.2s" }}>{b}</span>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+
+              {/* Botão principal: Iniciar / Próximo Boi */}
+              <div style={{ marginBottom: "10px" }}>
+                {!rodadaIniciada ? (
+                  <Btn
+                    variant="success"
+                    size="lg"
+                    full
+                    onClick={iniciarRodada}
+                    disabled={!proximaDupla}
+                    style={{ fontSize: "18px", letterSpacing: "2px", opacity: !proximaDupla ? 0.5 : 1, cursor: !proximaDupla ? "not-allowed" : "pointer" }}
+                  >
+                    ▶ INICIAR
+                  </Btn>
+                ) : (
+                  <Btn
+                    variant="primary"
+                    size="lg"
+                    full
+                    onClick={proximoBoi}
+                    disabled={!timerRodando}
+                    style={{ fontSize: "18px", letterSpacing: "2px", background: "linear-gradient(135deg,#1D6FD1,#1050A0)", opacity: !timerRodando ? 0.5 : 1 }}
+                  >
+                    🐄 PRÓXIMO BOI ({contadorBois}/10)
+                  </Btn>
+                )}
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "14px" }}>
-                <Btn variant="success" size="lg" full onClick={() => { if (!timerRodando) { setTempoTelao("00.000"); setTempoInicial(null); setTimerRodando(true); } }} disabled={timerRodando || !proximaDupla} style={{ opacity: (timerRodando || !proximaDupla) ? 0.5 : 1, cursor: (timerRodando || !proximaDupla) ? "not-allowed" : "pointer" }}>▶️ Iniciar</Btn>
-                <Btn variant="danger" size="lg" full onClick={() => setTimerRodando(false)} disabled={!timerRodando} style={{ opacity: !timerRodando ? 0.5 : 1, cursor: !timerRodando ? "not-allowed" : "pointer" }}>⏸️ Parar</Btn>
+              {/* Ações finais */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                <Btn variant="success" size="lg" full onClick={abrirTelao} style={{ fontSize: "13px" }}>🪟 Telão</Btn>
+                <Btn variant="amber" size="lg" full onClick={finalizarDuplaAtual} disabled={!rodadaIniciada && boisTelao === ""} style={{ fontSize: "13px", opacity: (!rodadaIniciada && boisTelao === "") ? 0.5 : 1 }}>✅ Finalizar</Btn>
+                <Btn variant="danger" size="lg" full onClick={registrarSAT} disabled={!timerRodando && tempoTelao === "00.000"} style={{ fontSize: "13px", opacity: (!timerRodando && tempoTelao === "00.000") ? 0.5 : 1 }}>SAT</Btn>
               </div>
 
-              <div style={{ marginBottom: "14px", display: "grid", gridTemplateColumns: "2fr 1fr", gap: "10px" }}>
-                <Input label="⏱️ Ajustar Tempo (SS.mmm)" value={tempoTelao} onChange={e => { const v = e.target.value.replace(",", "."); if (v === "" || /^\d{0,2}([.,]\d{0,3})?$/.test(v)) { setTempoTelao(v || "00.000"); setTimerRodando(false); } }} placeholder="00.000" disabled={timerRodando} />
-                <Input label="🐄 Bois (0-10)" value={boisTelao} onChange={e => { const v = e.target.value; if (v === "" || /^\d{0,2}$/.test(v)) { const num = parseInt(v); if (v === "" || (num >= 0 && num <= 10)) { setBoisTelao(v); setBoisErro(false); } } }} placeholder="0" disabled={timerRodando} type="number" style={boisErro ? { borderColor: "#ef4444", boxShadow: "0 0 0 2px rgba(239,68,68,0.25)" } : {}} />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
-                <Btn variant="success" size="lg" full onClick={abrirTelao} style={{ fontSize: "14px" }}>🪟 Abrir Telão</Btn>
-                <Btn variant="amber" size="lg" full onClick={finalizarDuplaAtual} style={{ fontSize: "14px" }}>✅ Finalizar Dupla</Btn>
-                <Btn variant="danger" size="lg" full onClick={registrarSAT} disabled={!timerRodando && tempoTelao === "00.000"} style={{ fontSize: "14px", opacity: (!timerRodando && tempoTelao === "00.000") ? 0.5 : 1, cursor: (!timerRodando && tempoTelao === "00.000") ? "not-allowed" : "pointer" }}>SAT</Btn>
-              </div>
+              {/* Reset manual */}
+              {rodadaIniciada && (
+                <Btn variant="ghost" size="md" full onClick={resetarRodada} style={{ fontSize: "12px", color: "#EF4444", borderColor: "#EF444430" }}>
+                  ↺ Resetar Rodada
+                </Btn>
+              )}
             </div>
 
             <div style={{ background: "#0F1F0F", border: "1px solid #22C55E33", borderRadius: "12px", padding: "16px", textAlign: "center" }}>
-              <div style={{ fontSize: "12px", color: "#22C55E", lineHeight: 1.6 }}>💡 <strong>Dica:</strong> Clique em "Abrir Telão" para exibir em outra janela. O controle considera sempre a prova ativa selecionada na aba de provas.</div>
+              <div style={{ fontSize: "12px", color: "#22C55E", lineHeight: 1.6 }}>💡 <strong>Dica:</strong> Clique em "Iniciar" para sortear o primeiro boi e disparar o cronômetro. Clique em "Próximo Boi" a cada boi passado. O resultado é salvo ao clicar em "Finalizar".</div>
             </div>
           </div>
         )}
