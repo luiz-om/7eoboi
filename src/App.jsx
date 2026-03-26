@@ -235,6 +235,16 @@ export default function RanchSortingApp() {
       return;
     }
 
+    if (password.length < 8) {
+      setAuthErro("A senha deve ter no minimo 8 caracteres.");
+      return;
+    }
+
+    if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+      setAuthErro("A senha deve conter letras e numeros.");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setAuthErro("As senhas nao coincidem.");
       return;
