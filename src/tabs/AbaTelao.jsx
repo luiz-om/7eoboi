@@ -180,25 +180,38 @@ export default function AbaTelao({
 
         {/* Bois usados / progresso */}
         {rodadaIniciada && boiAtual !== null && (
-          <div style={{ background: "#111", borderRadius: "8px", padding: "10px 12px", marginBottom: "12px", display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontSize: "10px", color: "#555", textTransform: "uppercase", letterSpacing: "1px", marginRight: "4px" }}>Ordem:</span>
-            {(() => {
-              const primeiroBoiDaRodada = boisUsados[0] ?? boiAtual;
-              const seq = Array.from({ length: 10 }, (_, i) => (primeiroBoiDaRodada + i) % 10);
-              return seq.map((b, i) => {
-                const usado = boisUsados.includes(b) && b !== boiAtual;
-                const atual = b === boiAtual;
-                const parcial = parciais?.find(p => p.boi === b);
-                return (
-                  <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
-                    <span style={{ width: "28px", height: "28px", borderRadius: "6px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 700, fontFamily: "'Oswald',sans-serif", background: atual ? "#F4C542" : usado ? "#1A3A1A" : "#1E1E1E", color: atual ? "#000" : usado ? "#22C55E" : "#333", border: atual ? "2px solid #F4C542" : usado ? "1px solid #22C55E44" : "1px solid #2A2A2A", transition: "all 0.2s" }}>{b}</span>
-                    {parcial && (
-                      <span style={{ fontSize: "8px", color: "#22C55E", fontFamily: "'Courier New',monospace", whiteSpace: "nowrap" }}>{parcial.tempo}</span>
-                    )}
-                  </div>
-                );
-              });
-            })()}
+          // Wrapper com ordem à esquerda e quadro vermelho à direita
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", marginBottom: "12px" }}>
+            <div style={{ background: "#111", borderRadius: "8px", padding: "10px 12px", display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center", flex: 1 }}>
+              <span style={{ fontSize: "10px", color: "#555", textTransform: "uppercase", letterSpacing: "1px", marginRight: "4px" }}>Ordem:</span>
+              {(() => {
+                const primeiroBoiDaRodada = boisUsados[0] ?? boiAtual;
+                const seq = Array.from({ length: 10 }, (_, i) => (primeiroBoiDaRodada + i) % 10);
+                return seq.map((b, i) => {
+                  const usado = boisUsados.includes(b) && b !== boiAtual;
+                  const atual = b === boiAtual;
+                  const parcial = parciais?.find(p => p.boi === b);
+                  return (
+                    <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                      <span style={{ width: "28px", height: "28px", borderRadius: "6px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 700, fontFamily: "'Oswald',sans-serif", background: atual ? "#F4C542" : usado ? "#1A3A1A" : "#1E1E1E", color: atual ? "#000" : usado ? "#22C55E" : "#333", border: atual ? "2px solid #F4C542" : usado ? "1px solid #22C55E44" : "1px solid #2A2A2A", transition: "all 0.2s" }}>{b}</span>
+                      {parcial && (
+                        <span style={{ fontSize: "8px", color: "#22C55E", fontFamily: "'Courier New',monospace", whiteSpace: "nowrap" }}>{parcial.tempo}</span>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Quadro vermelho à direita: tempo do boi atual ao vivo */}
+            <div style={{ minWidth: "120px", background: "transparent", borderRadius: "8px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+              <div style={{ fontSize: "9px", color: "#EF444488", textTransform: "uppercase", letterSpacing: "1px", fontFamily: "'Oswald',sans-serif" }}>TEMPO BOI</div>
+              <div style={{ width: "120px", height: "44px", border: "2px solid #EF4444", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", background: "#070707", boxShadow: timerRodando ? "0 0 10px rgba(239,68,68,0.3)" : "none" }}>
+                <div style={{ fontFamily: "'Courier New',monospace", fontSize: "18px", color: "#EF4444", fontWeight: 700, letterSpacing: "-1px" }}>
+                  {tempoTelao}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
