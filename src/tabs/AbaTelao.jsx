@@ -60,7 +60,9 @@ export default function AbaTelao({
       if (isEditableTarget(event.target)) return;
       if (event.code !== atalhoCode) return;
       event.preventDefault();
+      const bloqueioProximoBoi = !rodadaIniciada && !timerRodando && boisTelao !== "";
       if (!rodadaIniciada) {
+        if (bloqueioProximoBoi) return;
         if (proximaDupla) iniciarRodada();
         return;
       }
@@ -85,6 +87,7 @@ export default function AbaTelao({
   }
 
   const tempoFinalizado = !timerRodando && tempoTelao !== "00.000" && parseInt(boisTelao) > 0;
+  const bloqueioProximoBoi = !rodadaIniciada && !timerRodando && boisTelao !== "";
   const corTempo = timerRodando ? "#EF4444" : tempoFinalizado ? "#F4C542" : "#22C55E";
   const bordaCor = timerRodando ? "#EF4444" : tempoFinalizado ? "#F4C542" : "#2A2A2A";
   const label = timerRodando ? "● RODANDO" : tempoFinalizado ? `✔ TEMPO FINAL — ${boisTelao} BOIS` : "Aguardando";
@@ -200,8 +203,8 @@ export default function AbaTelao({
               size="lg"
               full
               onClick={iniciarRodada}
-              disabled={!proximaDupla}
-              style={{ fontSize: "18px", letterSpacing: "2px", opacity: !proximaDupla ? 0.5 : 1, cursor: !proximaDupla ? "not-allowed" : "pointer" }}
+              disabled={!proximaDupla || bloqueioProximoBoi}
+              style={{ fontSize: "18px", letterSpacing: "2px", opacity: (!proximaDupla || bloqueioProximoBoi) ? 0.5 : 1, cursor: (!proximaDupla || bloqueioProximoBoi) ? "not-allowed" : "pointer" }}
             >
               ▶ INICIAR
             </Btn>
