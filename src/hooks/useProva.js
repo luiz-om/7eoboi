@@ -482,6 +482,6 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     cavalosPremiadosDaProva, rankingCavalosDaProva, rankingCavalosGeral, rankingCompleto,
     // utils
     formatarData, formatarBois, duplaConcluida, duplaSat,
-    gerarListaRankingCompleta, gerarRanking,
+    gerarRanking, gerarListaRankingCompleta,
   };
 }

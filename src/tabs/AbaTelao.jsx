@@ -1,4 +1,16 @@
+import { useEffect, useMemo, useState } from "react";
 import { Btn } from "../components/ui";
+
+const ATALHO_STORAGE_KEY = "ranchsorting_atalho_tecla";
+
+function labelFromCode(code) {
+  if (!code) return "Espaco";
+  if (code === "Space") return "Espaco";
+  if (code === "Enter") return "Enter";
+  if (code.startsWith("Key")) return code.replace("Key", "");
+  if (code.startsWith("Digit")) return code.replace("Digit", "");
+  return code;
+}
 
 export default function AbaTelao({
   provaAtual,
@@ -22,6 +34,55 @@ export default function AbaTelao({
   abrirTelao,
 }) {
   if (!provaAtual) return null;
+
+  const [atalhoCode, setAtalhoCode] = useState("Space");
+  const atalhoLabel = useMemo(() => labelFromCode(atalhoCode), [atalhoCode]);
+
+  useEffect(() => {
+    try {
+      const salvo = window.localStorage.getItem(ATALHO_STORAGE_KEY);
+      if (salvo) setAtalhoCode(salvo);
+    } catch {
+      // Sem persistencia disponivel
+    }
+  }, []);
+
+  useEffect(() => {
+    function isEditableTarget(target) {
+      if (!target) return false;
+      const tag = target.tagName?.toLowerCase?.();
+      return tag === "input" || tag === "textarea" || tag === "select" || target.isContentEditable;
+    }
+
+    function handleKeydown(event) {
+      if (event.repeat) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (isEditableTarget(event.target)) return;
+      if (event.code !== atalhoCode) return;
+      event.preventDefault();
+      if (!rodadaIniciada) {
+        if (proximaDupla) iniciarRodada();
+        return;
+      }
+      if (timerRodando) proximoBoi();
+    }
+
+    window.addEventListener("keydown", handleKeydown);
+    return () => window.removeEventListener("keydown", handleKeydown);
+  }, [atalhoCode, iniciarRodada, proximaDupla, proximoBoi, rodadaIniciada, timerRodando]);
+
+  function capturarAtalho(event) {
+    event.preventDefault();
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    const code = event.code || "";
+    if (!code) return;
+    setAtalhoCode(code);
+    try {
+      window.localStorage.setItem(ATALHO_STORAGE_KEY, code);
+    } catch {
+      // Sem persistencia disponivel
+    }
+  }
 
   const tempoFinalizado = !timerRodando && tempoTelao !== "00.000" && parseInt(boisTelao) > 0;
   const corTempo = timerRodando ? "#EF4444" : tempoFinalizado ? "#F4C542" : "#22C55E";
@@ -158,6 +219,22 @@ export default function AbaTelao({
           )}
         </div>
 
+        {/* Atalho de teclado */}
+        <div style={{ background: "#111", borderRadius: "10px", padding: "12px", border: "1px solid #2A2A2A", marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: "11px", color: "#777", textTransform: "uppercase", letterSpacing: "1px", fontFamily: "'Oswald',sans-serif" }}>Atalho</div>
+            <div style={{ fontSize: "13px", color: "#C98A2E", marginTop: "4px" }}>Pressione a tecla para configurar</div>
+          </div>
+          <input
+            aria-label="Tecla de atalho"
+            value={atalhoLabel}
+            readOnly
+            onKeyDown={capturarAtalho}
+            onFocus={(e) => e.target.select()}
+            style={{ minWidth: "120px", textAlign: "center", background: "#0B0B0B", color: "#F4C542", border: "1px solid #C98A2E55", borderRadius: "8px", padding: "10px 12px", fontFamily: "'Oswald',sans-serif", fontSize: "14px", letterSpacing: "1px", outline: "none" }}
+          />
+        </div>
+
         {/* Ações finais */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "10px" }}>
           <Btn variant="success" size="lg" full onClick={abrirTelao} style={{ fontSize: "13px" }}>🪟 Telão</Btn>
@@ -174,7 +251,9 @@ export default function AbaTelao({
       </div>
 
       <div style={{ background: "#0F1F0F", border: "1px solid #22C55E33", borderRadius: "12px", padding: "16px", textAlign: "center" }}>
-        <div style={{ fontSize: "12px", color: "#22C55E", lineHeight: 1.6 }}>💡 <strong>Dica:</strong> Clique em "Iniciar" para sortear o primeiro boi e disparar o cronômetro. Clique em "Próximo Boi" a cada boi passado. O resultado é salvo ao clicar em "Finalizar".</div>
+        <div style={{ fontSize: "12px", color: "#22C55E", lineHeight: 1.6 }}>
+          💡 <strong>Dica:</strong> Clique em "Iniciar" para sortear o primeiro boi e disparar o cronômetro. Clique em "Próximo Boi" a cada boi passado. O resultado é salvo ao clicar em "Finalizar". Atalho atual: <strong>{atalhoLabel}</strong>.
+        </div>
       </div>
     </div>
   );
