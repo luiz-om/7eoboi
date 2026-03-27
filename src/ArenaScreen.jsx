@@ -238,7 +238,7 @@ export default function ArenaScreen({
           gap: clamp(16px, 3vw, 56px);
         }
         .arena-timer {
-          font-size: clamp(52px, 13vw, 180px);
+          font-size: clamp(49px, 12.35vw, 171px);
           font-family: 'Courier New', monospace;
           font-weight: 800; color: #22C55E;
           letter-spacing: -4px; line-height: 0.9;
@@ -256,7 +256,7 @@ export default function ArenaScreen({
         }
         /* Bloco do boi: mesma altura visual do cronômetro */
         .arena-boi-inline {
-          font-size: clamp(52px, 13vw, 180px);
+          font-size: clamp(49px, 12.35vw, 171px);
           font-family: 'Oswald', sans-serif;
           font-weight: 900;
           color: #F4C542;
