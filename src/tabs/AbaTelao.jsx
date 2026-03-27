@@ -195,7 +195,7 @@ export default function AbaTelao({
                     <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
                       <span style={{ width: "28px", height: "28px", borderRadius: "6px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 700, fontFamily: "'Oswald',sans-serif", background: atual ? "#F4C542" : usado ? "#1A3A1A" : "#1E1E1E", color: atual ? "#000" : usado ? "#22C55E" : "#333", border: atual ? "2px solid #F4C542" : usado ? "1px solid #22C55E44" : "1px solid #2A2A2A", transition: "all 0.2s" }}>{b}</span>
                       {parcial && (
-                        <span style={{ fontSize: "8px", color: "#22C55E", fontFamily: "'Courier New',monospace", whiteSpace: "nowrap" }}>{parcial.tempo}</span>
+                        <span style={{ fontSize: "11px", color: "#22C55E", fontFamily: "'Courier New',monospace", whiteSpace: "nowrap", fontWeight: 700 }}>{parcial.tempo}</span>
                       )}
                     </div>
                   );
@@ -223,7 +223,7 @@ export default function AbaTelao({
               {parciais.map((p, i) => (
                 <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
                   <span style={{ width: "28px", height: "28px", borderRadius: "6px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 700, fontFamily: "'Oswald',sans-serif", background: "#1A3A1A", color: "#22C55E", border: "1px solid #22C55E44" }}>{p.boi}</span>
-                  <span style={{ fontSize: "8px", color: "#22C55E", fontFamily: "'Courier New',monospace", whiteSpace: "nowrap" }}>{p.tempo}</span>
+                  <span style={{ fontSize: "11px", color: "#22C55E", fontFamily: "'Courier New',monospace", whiteSpace: "nowrap", fontWeight: 700 }}>{p.tempo}</span>
                 </div>
               ))}
             </div>

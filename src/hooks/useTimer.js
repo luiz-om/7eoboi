@@ -95,6 +95,8 @@ export function useTimer({ isTelaoWindow }) {
     setTimerRodando(false);
     setTempoInicial(null);
     setTempoTelao("00.000");
+    setBoisTelao("");
+    setBoisErro(false);
   }
 
   function iniciarRodada() {
