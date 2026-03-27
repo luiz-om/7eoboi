@@ -287,7 +287,7 @@ export default function RanchSortingApp() {
             timerRodando={timerRodando} tempoTelao={tempoTelao}
             boisTelao={boisTelao} boiAtual={boiAtual}
             contadorBois={contadorBois} rodadaIniciada={rodadaIniciada}
-            boisUsados={boisUsados} provaFinalizada={provaFinalizada}
+            boisUsados={boisUsados} parciais={parciais} provaFinalizada={provaFinalizada}
             iniciarRodada={iniciarRodada} proximoBoi={proximoBoi}
             resetarRodada={resetarRodada}
             finalizarDuplaAtual={() => finalizarDuplaAtual({ tempoTelao, rodadaIniciada, contadorBois, boisTelao, parciais, setBoisErro, resetarRodada, setBoisTelao })}

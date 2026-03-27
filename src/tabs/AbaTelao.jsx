@@ -25,6 +25,7 @@ export default function AbaTelao({
   contadorBois,
   rodadaIniciada,
   boisUsados,
+  parciais,
   provaFinalizada,
   iniciarRodada,
   proximoBoi,
@@ -187,11 +188,32 @@ export default function AbaTelao({
               return seq.map((b, i) => {
                 const usado = boisUsados.includes(b) && b !== boiAtual;
                 const atual = b === boiAtual;
+                const parcial = parciais?.find(p => p.boi === b);
                 return (
-                  <span key={i} style={{ width: "28px", height: "28px", borderRadius: "6px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 700, fontFamily: "'Oswald',sans-serif", background: atual ? "#F4C542" : usado ? "#1A3A1A" : "#1E1E1E", color: atual ? "#000" : usado ? "#22C55E" : "#333", border: atual ? "2px solid #F4C542" : usado ? "1px solid #22C55E44" : "1px solid #2A2A2A", transition: "all 0.2s" }}>{b}</span>
+                  <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                    <span style={{ width: "28px", height: "28px", borderRadius: "6px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 700, fontFamily: "'Oswald',sans-serif", background: atual ? "#F4C542" : usado ? "#1A3A1A" : "#1E1E1E", color: atual ? "#000" : usado ? "#22C55E" : "#333", border: atual ? "2px solid #F4C542" : usado ? "1px solid #22C55E44" : "1px solid #2A2A2A", transition: "all 0.2s" }}>{b}</span>
+                    {parcial && (
+                      <span style={{ fontSize: "8px", color: "#22C55E", fontFamily: "'Courier New',monospace", whiteSpace: "nowrap" }}>{parcial.tempo}</span>
+                    )}
+                  </div>
                 );
               });
             })()}
+          </div>
+        )}
+
+        {/* Bois finalizados com tempos — exibido após rodada encerrar */}
+        {!rodadaIniciada && parciais?.length > 0 && (
+          <div style={{ background: "#111", borderRadius: "8px", padding: "10px 12px", marginBottom: "12px" }}>
+            <div style={{ fontSize: "10px", color: "#555", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>Tempos por boi:</div>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "flex-start" }}>
+              {parciais.map((p, i) => (
+                <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                  <span style={{ width: "28px", height: "28px", borderRadius: "6px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 700, fontFamily: "'Oswald',sans-serif", background: "#1A3A1A", color: "#22C55E", border: "1px solid #22C55E44" }}>{p.boi}</span>
+                  <span style={{ fontSize: "8px", color: "#22C55E", fontFamily: "'Courier New',monospace", whiteSpace: "nowrap" }}>{p.tempo}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -246,7 +268,7 @@ export default function AbaTelao({
         </div>
 
         {/* Reset manual */}
-        {rodadaIniciada && (
+        {(rodadaIniciada || tempoFinalizado) && (
           <Btn variant="ghost" size="md" full onClick={resetarRodada} style={{ fontSize: "12px", color: "#EF4444", borderColor: "#EF444430" }}>
             ↺ Resetar Rodada
           </Btn>
