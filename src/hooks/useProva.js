@@ -293,6 +293,18 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
   const duplas = provaAtual?.duplas ?? [];
   const provaFinalizada = Boolean(provaAtual?.finalizada);
 
+  // ─── Derivados ─────────────────────────────────────────────────────────────
+  const ranking = gerarRanking(duplas);
+  const semResultado = duplas.filter((d) => !duplaConcluida(d));
+  const comResultado = duplas.filter((d) => duplaConcluida(d));
+  const proximaDupla = duplas.find((d) => !duplaConcluida(d)) ?? null;
+  const medalhas = ["🥇", "🥈", "🥉"];
+  const fmt = (t) => (t == null ? "—" : t.toFixed(3) + "s");
+  const cavalosPremiadosDaProva = listarCavalosPremiados(provaAtual);
+  const rankingCavalosDaProva = gerarRankingCavalos(provas, { provaId: provaAtualId });
+  const rankingCavalosGeral = gerarRankingCavalos(provas, { apenasFinalizadas: true });
+  const rankingCompleto = gerarListaRankingCompleta(duplas);
+
   async function cadastrarDupla() {
     if (!provaAtual) { toast("Cadastre ou selecione uma prova primeiro.", "erro"); return; }
     const { cavaleiro1, cavalo1, cavaleiro2, cavalo2 } = form;
