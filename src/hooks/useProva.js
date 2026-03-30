@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createDupla,
   createProva,
@@ -37,27 +37,37 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
   const [provaAtualId, setProvaAtualId] = useState(provaIdTelao);
   const [form, setForm] = useState({ cavaleiro1: "", cavalo1: "", cavaleiro2: "", cavalo2: "" });
   const [resultadoForm, setResultadoForm] = useState({ duplaId: "", bois: "", tempo: "" });
-  const [provaForm, setProvaForm] = useState({ nome: "", local: "", data: new Date().toISOString().slice(0, 10), observacoes: "" });
+  const [provaForm, setProvaForm] = useState({
+    nome: "",
+    local: "",
+    data: new Date().toISOString().slice(0, 10),
+    observacoes: "",
+  });
   const [erroConexao, setErroConexao] = useState("");
   const [editandoId, setEditandoId] = useState(null);
   const [editandoResultadoId, setEditandoResultadoId] = useState(null);
   const [editandoProvaId, setEditandoProvaId] = useState(null);
 
-  // ─── carregarDados ─────────────────────────────────────────────────────────
+  // ✅ useRef para timeout evita stale closure
+  const timeoutRef = useRef(null);
 
-  async function carregarDados(preferidoId = null) {
-    const lista = await listProvasComDuplas();
-    setProvas(lista);
-    setProvaAtualId((atual) => {
-      if (isTelaoWindow && provaIdTelao) return provaIdTelao;
-      const alvo = preferidoId || atual;
-      if (alvo && lista.some((prova) => prova.id === alvo)) return alvo;
-      return lista[0]?.id || "";
-    });
-  }
+  // ─── carregarDados ─────────────────────────────────────────────────────────
+  // ✅ useCallback estabiliza a referência para uso nos useEffect
+  const carregarDados = useCallback(
+    async (preferidoId = null) => {
+      const lista = await listProvasComDuplas();
+      setProvas(lista);
+      setProvaAtualId((atual) => {
+        if (isTelaoWindow && provaIdTelao) return provaIdTelao;
+        const alvo = preferidoId || atual;
+        if (alvo && lista.some((prova) => prova.id === alvo)) return alvo;
+        return lista[0]?.id || "";
+      });
+    },
+    [isTelaoWindow, provaIdTelao]
+  );
 
   // ─── Auth session ──────────────────────────────────────────────────────────
-
   useEffect(() => {
     let ativo = true;
     const iniciarSessao = async () => {
@@ -77,55 +87,80 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
       setSessao(session);
       setAuthCarregando(false);
     });
-    return () => { ativo = false; listener.subscription.unsubscribe(); };
+    return () => {
+      ativo = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   // ─── Dados após login ──────────────────────────────────────────────────────
-
   useEffect(() => {
-    if (!sessao) { setProvas([]); setCarregando(false); return undefined; }
+    if (!sessao) {
+      setProvas([]);
+      setCarregando(false);
+      return;
+    }
     let ativo = true;
-    let timeoutId = null;
-    const withTimeout = (promise, ms = 12000) =>
-      Promise.race([
-        promise,
-        new Promise((_, reject) => { timeoutId = window.setTimeout(() => reject(new Error("Tempo excedido ao conectar com o Supabase.")), ms); }),
-      ]);
+
     const iniciar = async () => {
       try {
         setCarregando(true);
         setErroConexao("");
-        await withTimeout(carregarDados(isTelaoWindow ? provaIdTelao : null));
+        // ✅ useRef para o timeout em vez de variável local
+        const promise = carregarDados(isTelaoWindow ? provaIdTelao : null);
+        await Promise.race([
+          promise,
+          new Promise((_, reject) => {
+            timeoutRef.current = window.setTimeout(
+              () => reject(new Error("Tempo excedido ao conectar com o Supabase.")),
+              12000
+            );
+          }),
+        ]);
       } catch (error) {
         if (!ativo) return;
         const msg = error?.message || "Nao foi possivel conectar ao Supabase.";
         setErroConexao(msg);
         toast(msg, "erro");
       } finally {
-        if (timeoutId) window.clearTimeout(timeoutId);
+        if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
         if (ativo) setCarregando(false);
       }
     };
+
     iniciar();
+
     const channel = supabase
       .channel(`db-changes-${isTelaoWindow ? "telao" : "app"}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "provas" }, () => { carregarDados(isTelaoWindow ? provaIdTelao : null).catch(() => {}); })
-      .on("postgres_changes", { event: "*", schema: "public", table: "duplas" }, () => { carregarDados(isTelaoWindow ? provaIdTelao : null).catch(() => {}); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "provas" }, () => {
+        carregarDados(isTelaoWindow ? provaIdTelao : null).catch(() => {});
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "duplas" }, () => {
+        carregarDados(isTelaoWindow ? provaIdTelao : null).catch(() => {});
+      })
       .subscribe();
-    return () => { ativo = false; if (timeoutId) window.clearTimeout(timeoutId); supabase.removeChannel(channel); };
-  }, [isTelaoWindow, provaIdTelao, sessao]);
+
+    return () => {
+      ativo = false;
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+      supabase.removeChannel(channel);
+    };
+    // ✅ carregarDados agora é estável via useCallback
+  }, [isTelaoWindow, provaIdTelao, sessao, carregarDados, toast]);
 
   // Auto-selecionar primeira prova
   useEffect(() => {
-    if (!provas.length) { setProvaAtualId(""); return; }
-    if (!provaAtualId || !provas.some(prova => prova.id === provaAtualId)) {
+    if (!provas.length) {
+      setProvaAtualId("");
+      return;
+    }
+    if (!provaAtualId || !provas.some((prova) => prova.id === provaAtualId)) {
       setProvaAtualId(provas[0].id);
     }
   }, [provas, provaAtualId]);
 
   // ─── Auth handlers ─────────────────────────────────────────────────────────
-
-  async function handleSignIn({ email, password }) {
+  const handleSignIn = useCallback(async ({ email, password }) => {
     if (!email.trim() || !password) { setAuthErro("Informe email e senha."); return; }
     try {
       setAuthProcessando(true); setAuthErro(""); setAuthInfo("");
@@ -133,9 +168,9 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     } catch (error) {
       setAuthErro(error?.message || "Nao foi possivel entrar.");
     } finally { setAuthProcessando(false); }
-  }
+  }, []);
 
-  async function handleSignUp({ email, password, confirmPassword }) {
+  const handleSignUp = useCallback(async ({ email, password, confirmPassword }) => {
     if (!email.trim() || !password || !confirmPassword) { setAuthErro("Preencha email, senha e confirmacao de senha."); return; }
     if (password.length < 8) { setAuthErro("A senha deve ter no minimo 8 caracteres."); return; }
     if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) { setAuthErro("A senha deve conter letras e numeros."); return; }
@@ -143,36 +178,39 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     try {
       setAuthProcessando(true); setAuthErro(""); setAuthInfo("");
       const data = await signUpWithEmail({ email, password });
-      if (data.session) { setAuthInfo("Conta criada com sucesso."); }
-      else { setAuthInfo("Conta criada. Verifique seu email para confirmar o cadastro."); }
+      if (data.session) setAuthInfo("Conta criada com sucesso.");
+      else setAuthInfo("Conta criada. Verifique seu email para confirmar o cadastro.");
     } catch (error) {
       setAuthErro(error?.message || "Nao foi possivel criar a conta.");
     } finally { setAuthProcessando(false); }
-  }
+  }, []);
 
-  async function handleSignOut() {
+  const handleSignOut = useCallback(async () => {
     try {
       await signOut();
       setAuthInfo(""); setAuthErro(""); setErroConexao("");
-      setProvas([]); setProvaAtualId(""); 
+      setProvas([]); setProvaAtualId("");
     } catch (error) {
       toast(error?.message || "Nao foi possivel sair da conta.", "erro");
     }
-  }
+  }, [toast]);
 
   // ─── Prova CRUD ────────────────────────────────────────────────────────────
-
-  function resetarFormProva() {
+  const resetarFormProva = useCallback(() => {
     setProvaForm({ nome: "", local: "", data: new Date().toISOString().slice(0, 10), observacoes: "" });
     setEditandoProvaId(null);
-  }
+  }, []);
 
   async function salvarProva() {
     if (!provaForm.nome.trim()) { toast("Informe o nome da prova.", "erro"); return; }
     try {
       if (editandoProvaId) {
-        const provaExistente = provas.find((prova) => prova.id === editandoProvaId);
-        await updateProva(editandoProvaId, { ...provaForm, finalizada: Boolean(provaExistente?.finalizada), finalizadaEm: provaExistente?.finalizadaEm || null });
+        const provaExistente = provas.find((p) => p.id === editandoProvaId);
+        await updateProva(editandoProvaId, {
+          ...provaForm,
+          finalizada: Boolean(provaExistente?.finalizada),
+          finalizadaEm: provaExistente?.finalizadaEm ?? null,
+        });
         await carregarDados(editandoProvaId);
         toast("Prova atualizada!");
       } else {
@@ -186,7 +224,12 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
   }
 
   function editarProva(prova) {
-    setProvaForm({ nome: prova.nome || "", local: prova.local || "", data: prova.data || new Date().toISOString().slice(0, 10), observacoes: prova.observacoes || "" });
+    setProvaForm({
+      nome: prova.nome || "",
+      local: prova.local || "",
+      data: prova.data || new Date().toISOString().slice(0, 10),
+      observacoes: prova.observacoes || "",
+    });
     setEditandoProvaId(prova.id);
   }
 
@@ -199,11 +242,11 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
   }
 
   async function removerProva(id) {
-    const prova = provas.find(item => item.id === id);
-    if (!prova) return;
+    const provaAlvo = provas.find((item) => item.id === id);
+    if (!provaAlvo) return;
     abrirConfirmacao({
       title: "Remover prova",
-      text: `A prova "${prova.nome}" e todas as duplas vinculadas serao removidas.`,
+      text: `A prova "${provaAlvo.nome}" e todas as duplas vinculadas serao removidas.`,
       confirmLabel: "Remover",
       confirmVariant: "danger",
       onConfirm: async () => {
@@ -217,35 +260,37 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
   }
 
   async function finalizarProva(id) {
-    try {
-      const prova = provas.find((item) => item.id === id);
-      if (!prova) return;
-      if (prova.finalizada) { toast("Essa prova ja foi finalizada.", "erro"); return; }
-      abrirConfirmacao({
-        title: "Finalizar prova",
-        text: `A prova "${prova.nome}" sera encerrada e as duplas ficarao bloqueadas para edicao.`,
-        confirmLabel: "Finalizar",
-        confirmVariant: "amber",
-        onConfirm: async () => {
-          try {
-            await updateProva(prova.id, { nome: prova.nome, local: prova.local, data: prova.data, observacoes: prova.observacoes, finalizada: true, finalizadaEm: new Date().toISOString() });
-            resetarFormProva();
-            setForm({ cavaleiro1: "", cavalo1: "", cavaleiro2: "", cavalo2: "" });
-            setResultadoForm({ duplaId: "", bois: "", tempo: "" });
-            setEditandoId(null);
-            setEditandoResultadoId(null);
-            await carregarDados(provaAtualId === prova.id ? null : provaAtualId);
-            toast(`Prova "${prova.nome}" finalizada.`);
-          } catch (error) { toast(error.message || "Nao foi possivel finalizar a prova.", "erro"); }
-        },
-      });
-    } catch (error) { toast(error.message || "Nao foi possivel finalizar a prova.", "erro"); }
+    const provaAlvo = provas.find((item) => item.id === id);
+    if (!provaAlvo) return;
+    if (provaAlvo.finalizada) { toast("Essa prova ja foi finalizada.", "erro"); return; }
+    abrirConfirmacao({
+      title: "Finalizar prova",
+      text: `A prova "${provaAlvo.nome}" sera encerrada e as duplas ficarao bloqueadas para edicao.`,
+      confirmLabel: "Finalizar",
+      confirmVariant: "amber",
+      onConfirm: async () => {
+        try {
+          await updateProva(provaAlvo.id, {
+            nome: provaAlvo.nome, local: provaAlvo.local, data: provaAlvo.data,
+            observacoes: provaAlvo.observacoes, finalizada: true,
+            finalizadaEm: new Date().toISOString(),
+          });
+          resetarFormProva();
+          setForm({ cavaleiro1: "", cavalo1: "", cavaleiro2: "", cavalo2: "" });
+          setResultadoForm({ duplaId: "", bois: "", tempo: "" });
+          setEditandoId(null);
+          setEditandoResultadoId(null);
+          await carregarDados(provaAtualId === provaAlvo.id ? null : provaAtualId);
+          toast(`Prova "${provaAlvo.nome}" finalizada.`);
+        } catch (error) { toast(error.message || "Nao foi possivel finalizar a prova.", "erro"); }
+      },
+    });
   }
 
   // ─── Dupla CRUD ────────────────────────────────────────────────────────────
 
-  const provaAtual = provas.find(prova => prova.id === provaAtualId) || null;
-  const duplas = provaAtual?.duplas || [];
+  const provaAtual = provas.find((prova) => prova.id === provaAtualId) ?? null;
+  const duplas = provaAtual?.duplas ?? [];
   const provaFinalizada = Boolean(provaAtual?.finalizada);
 
   async function cadastrarDupla() {
@@ -385,7 +430,6 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
   }
 
   // ─── Export / Impressão ────────────────────────────────────────────────────
-
   function gerarNomeArquivoResultados(prova) {
     const base = prova?.nome?.trim() || "prova";
     const slug = base.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -452,19 +496,6 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     popup.document.open(); popup.document.write(html); popup.document.close();
   }
 
-  // ─── Derivados ─────────────────────────────────────────────────────────────
-
-  const ranking = gerarRanking(duplas);
-  const semResultado = duplas.filter(d => !duplaConcluida(d));
-  const comResultado = duplas.filter(d => duplaConcluida(d));
-  const proximaDupla = duplas.find(d => !duplaConcluida(d)) || null;
-  const medalhas = ["🥇", "🥈", "🥉"];
-  const fmt = t => t == null ? "—" : t.toFixed(3) + "s";
-  const cavalosPremiadosDaProva = listarCavalosPremiados(provaAtual);
-  const rankingCavalosDaProva = gerarRankingCavalos(provas, { provaId: provaAtualId });
-  const rankingCavalosGeral = gerarRankingCavalos(provas, { apenasFinalizadas: true });
-  const rankingCompleto = gerarListaRankingCompleta(duplas);
-
   return {
     sessao, authCarregando, authProcessando, authErro, authInfo,
     carregando, erroConexao, provas, provaAtualId, setProvaAtualId,
@@ -480,7 +511,6 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     provaAtual, duplas, ranking, semResultado, comResultado, proximaDupla,
     medalhas, fmt, provaFinalizada,
     cavalosPremiadosDaProva, rankingCavalosDaProva, rankingCavalosGeral, rankingCompleto,
-    // utils
     formatarData, formatarBois, duplaConcluida, duplaSat,
     gerarRanking, gerarListaRankingCompleta,
   };

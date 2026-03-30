@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 
-export default function ArenaScreen({
+// ✅ memo evita re-render quando as props não mudam
+const ArenaScreen = memo(function ArenaScreen({
   duplas,
   ranking,
   tempo,
@@ -14,11 +15,10 @@ export default function ArenaScreen({
 }) {
   const [animacoes, setAnimacoes] = useState(new Set());
 
+  // ✅ usar ranking.length como dep estável para disparar animações somente quando o ranking muda
   useEffect(() => {
     const timer = setTimeout(() => {
-      const novasAnimacoes = new Set();
-      ranking.slice(0, 10).forEach((_, i) => novasAnimacoes.add(i));
-      setAnimacoes(novasAnimacoes);
+      setAnimacoes(new Set(ranking.slice(0, 10).map((_, i) => i)));
     }, 100);
     return () => clearTimeout(timer);
   }, [ranking]);
@@ -536,4 +536,6 @@ export default function ArenaScreen({
       `}</style>
     </div>
   );
-}
+});
+
+export default ArenaScreen;

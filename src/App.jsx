@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import ArenaScreen from "./ArenaScreen";
 import AuthScreen from "./components/auth/AuthScreen";
 import { Btn, ConfirmDialog, EmptyState, ModernTab, StatCard } from "./components/ui";
@@ -12,27 +12,43 @@ import AbaCertificados from "./tabs/AbaCertificados";
 import AbaTelao from "./tabs/AbaTelao";
 import logoExbe from "./assets/Logo_Exbe.png";
 
-export default function RanchSortingApp() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const isTelaoWindow = urlParams.get("telao") === "true";
-  const provaIdTelao = urlParams.get("prova") || "";
+// ✅ Calculado uma única vez fora do componente (não precisa re-executar a cada render)
+const urlParams = new URLSearchParams(window.location.search);
+const IS_TELAO_WINDOW = urlParams.get("telao") === "true";
+const PROVA_ID_TELAO = urlParams.get("prova") || "";
 
+export default function RanchSortingApp() {
   const [aba, setAba] = useState("provas");
   const [mensagem, setMensagem] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [confirmando, setConfirmando] = useState(false);
 
-  function toast(msg, tipo = "ok") { setMensagem({ texto: msg, tipo }); setTimeout(() => setMensagem(null), 3000); }
-  function abrirConfirmacao(config) { setConfirmDialog(config); }
-  function fecharConfirmacao() { setConfirmDialog(null); setConfirmando(false); }
-  async function confirmarAcao() {
+  // ✅ useCallback estabiliza referências passadas para hooks e filhos
+  const toast = useCallback((msg, tipo = "ok") => {
+    setMensagem({ texto: msg, tipo });
+    setTimeout(() => setMensagem(null), 3000);
+  }, []);
+
+  const abrirConfirmacao = useCallback((config) => setConfirmDialog(config), []);
+
+  const fecharConfirmacao = useCallback(() => {
+    setConfirmDialog(null);
+    setConfirmando(false);
+  }, []);
+
+  const confirmarAcao = useCallback(async () => {
     if (!confirmDialog?.onConfirm) return;
     setConfirmando(true);
     try { await confirmDialog.onConfirm(); } finally { fecharConfirmacao(); }
-  }
+  }, [confirmDialog, fecharConfirmacao]);
 
-  const timer = useTimer({ isTelaoWindow });
-  const prova = useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao });
+  const timer = useTimer({ isTelaoWindow: IS_TELAO_WINDOW });
+  const prova = useProva({
+    isTelaoWindow: IS_TELAO_WINDOW,
+    provaIdTelao: PROVA_ID_TELAO,
+    toast,
+    abrirConfirmacao,
+  });
 
   const {
     sessao, authCarregando, authProcessando, authErro, authInfo,
@@ -59,13 +75,13 @@ export default function RanchSortingApp() {
     resetarRodada, iniciarRodada, proximoBoi, encerrarRodadaComBois,
   } = timer;
 
-  const abrirTelao = () => {
+  const abrirTelao = useCallback(() => {
     const params = new URLSearchParams();
     params.set("telao", "true");
-    if (provaAtualId) params.set("prova", provaAtualId);
+    if (prova.provaAtualId) params.set("prova", prova.provaAtualId);
     const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
     window.open(url, "telao", "width=1920,height=1080,fullscreen=yes");
-  };
+  }, [prova.provaAtualId]);
 
   // ─── Loading / Auth / Error screens ────────────────────────────────────────
 
@@ -111,7 +127,7 @@ export default function RanchSortingApp() {
     );
   }
 
-  if (isTelaoWindow) {
+  if (IS_TELAO_WINDOW) {
     return (
       <ArenaScreen
         duplas={duplas}

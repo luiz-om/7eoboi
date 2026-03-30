@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Btn } from "../components/ui";
 
 const ATALHO_STORAGE_KEY = "ranchsorting_atalho_tecla";
@@ -34,8 +34,7 @@ export default function AbaTelao({
   registrarSAT,
   abrirTelao,
 }) {
-  if (!provaAtual) return null;
-
+  // ✅ Hooks ANTES do early return (regra dos Hooks)
   const [atalhoCode, setAtalhoCode] = useState("Space");
   const atalhoLabel = useMemo(() => labelFromCode(atalhoCode), [atalhoCode]);
 
@@ -48,11 +47,20 @@ export default function AbaTelao({
     }
   }, []);
 
+  const bloqueioProximoBoi = !rodadaIniciada && !timerRodando && boisTelao !== "";
+
   useEffect(() => {
+    if (!provaAtual) return;
+
     function isEditableTarget(target) {
       if (!target) return false;
       const tag = target.tagName?.toLowerCase?.();
-      return tag === "input" || tag === "textarea" || tag === "select" || target.isContentEditable;
+      return (
+        tag === "input" ||
+        tag === "textarea" ||
+        tag === "select" ||
+        target.isContentEditable
+      );
     }
 
     function handleKeydown(event) {
@@ -61,7 +69,6 @@ export default function AbaTelao({
       if (isEditableTarget(event.target)) return;
       if (event.code !== atalhoCode) return;
       event.preventDefault();
-      const bloqueioProximoBoi = !rodadaIniciada && !timerRodando && boisTelao !== "";
       if (!rodadaIniciada) {
         if (bloqueioProximoBoi) return;
         if (proximaDupla) iniciarRodada();
@@ -72,9 +79,18 @@ export default function AbaTelao({
 
     window.addEventListener("keydown", handleKeydown);
     return () => window.removeEventListener("keydown", handleKeydown);
-  }, [atalhoCode, iniciarRodada, proximaDupla, proximoBoi, rodadaIniciada, timerRodando]);
+  }, [
+    provaAtual,
+    atalhoCode,
+    bloqueioProximoBoi,
+    iniciarRodada,
+    proximaDupla,
+    proximoBoi,
+    rodadaIniciada,
+    timerRodando,
+  ]);
 
-  function capturarAtalho(event) {
+  const capturarAtalho = useCallback((event) => {
     event.preventDefault();
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     const code = event.code || "";
@@ -85,13 +101,20 @@ export default function AbaTelao({
     } catch {
       // Sem persistencia disponivel
     }
-  }
+  }, []);
 
-  const tempoFinalizado = !timerRodando && tempoTelao !== "00.000" && parseInt(boisTelao) > 0;
-  const bloqueioProximoBoi = !rodadaIniciada && !timerRodando && boisTelao !== "";
+  // ✅ Early return DEPOIS de todos os hooks
+  if (!provaAtual) return null;
+
+  const tempoFinalizado =
+    !timerRodando && tempoTelao !== "00.000" && parseInt(boisTelao) > 0;
   const corTempo = timerRodando ? "#EF4444" : tempoFinalizado ? "#F4C542" : "#22C55E";
   const bordaCor = timerRodando ? "#EF4444" : tempoFinalizado ? "#F4C542" : "#2A2A2A";
-  const label = timerRodando ? "● RODANDO" : tempoFinalizado ? `✔ TEMPO FINAL — ${boisTelao} BOIS` : "Aguardando";
+  const label = timerRodando
+    ? "● RODANDO"
+    : tempoFinalizado
+    ? `✔ TEMPO FINAL — ${boisTelao} BOIS`
+    : "Aguardando";
   const labelCor = timerRodando ? "#EF4444" : tempoFinalizado ? "#F4C542" : "#555";
 
   return (
