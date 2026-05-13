@@ -79,7 +79,9 @@ export default function AbaProvas({
                 {prova.observacoes ? <div style={{ fontSize: "12px", color: "#555", marginTop: "8px" }}>{prova.observacoes}</div> : null}
               </div>
               <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                <Btn variant="secondary" size="sm" onClick={e => { e.stopPropagation(); editarProva(prova); }}>✏️</Btn>
+                {!finalizada ? (
+                  <Btn variant="secondary" size="sm" onClick={e => { e.stopPropagation(); editarProva(prova); }}>✏️</Btn>
+                ) : null}
                 {!finalizada ? (
                   <Btn variant="amber" size="sm" onClick={e => { e.stopPropagation(); finalizarProva(prova.id); }}>🏁</Btn>
                 ) : null}

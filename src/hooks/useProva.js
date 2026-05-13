@@ -224,6 +224,10 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
   }
 
   function editarProva(prova) {
+    if (prova.finalizada) {
+      toast("Prova finalizada. Nao e permitido editar.", "erro");
+      return;
+    }
     setProvaForm({
       nome: prova.nome || "",
       local: prova.local || "",
@@ -307,6 +311,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
 
   async function cadastrarDupla() {
     if (!provaAtual) { toast("Cadastre ou selecione uma prova primeiro.", "erro"); return; }
+    if (provaFinalizada) { toast("Prova finalizada. Nao e permitido alterar duplas.", "erro"); return; }
     const { cavaleiro1, cavalo1, cavaleiro2, cavalo2 } = form;
     if (!cavaleiro1 || !cavalo1 || !cavaleiro2 || !cavalo2) { toast("Preencha todos os campos!", "erro"); return; }
     try {
@@ -326,6 +331,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
   }
 
   function editarDupla(dp) {
+    if (provaFinalizada) { toast("Prova finalizada. Nao e permitido alterar duplas.", "erro"); return; }
     setForm({ cavaleiro1: dp.cavaleiro1, cavalo1: dp.cavalo1, cavaleiro2: dp.cavaleiro2, cavalo2: dp.cavalo2 });
     setEditandoId(dp.id);
   }
@@ -358,7 +364,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
 
   async function salvarResultado() {
     if (!provaAtual) { toast("Cadastre ou selecione uma prova primeiro.", "erro"); return; }
-    if (provaFinalizada && !editandoResultadoId) { toast("Prova finalizada. Consulte o historico da prova.", "erro"); return; }
+    if (provaFinalizada) { toast("Prova finalizada. Nao e permitido alterar resultados.", "erro"); return; }
     const { duplaId, bois, tempo } = resultadoForm;
     if (!duplaId || bois === "" || tempo === "") { toast("Preencha todos os campos!", "erro"); return; }
     const b = parseInt(bois);
@@ -376,6 +382,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
   }
 
   function iniciarEdicaoResultado(dp) {
+    if (provaFinalizada) { toast("Prova finalizada. Nao e permitido alterar resultados.", "erro"); return; }
     setEditandoResultadoId(dp.id);
     setResultadoForm({ duplaId: dp.id, bois: duplaSat(dp) ? "" : String(dp.bois), tempo: dp.tempo == null ? "" : String(dp.tempo) });
   }
