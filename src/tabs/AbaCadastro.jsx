@@ -11,6 +11,8 @@ export default function AbaCadastro({
   editarDupla,
   cancelarEdicao,
   removerDupla,
+  moverDupla,
+  importarDuplasCsv,
   formatarData,
   formatarBois,
   duplaConcluida,
@@ -41,6 +43,38 @@ export default function AbaCadastro({
           <Input label="🤠 Cavaleiro 2" value={form.cavaleiro2} onChange={e => setForm(p => ({ ...p, cavaleiro2: e.target.value }))} placeholder="Nome do cavaleiro" />
           <Input label="🐴 Cavalo 2" value={form.cavalo2} onChange={e => setForm(p => ({ ...p, cavalo2: e.target.value }))} placeholder="Nome do cavalo" />
         </div>
+        <div style={{ fontSize: "12px", color: "#B9D9C0", marginBottom: "12px" }}>
+          Importe um arquivo CSV ou Excel com duas colunas: <strong>Competidor 1</strong> e <strong>Competidor 2</strong>. Os campos de cavalo serao deixados em branco.
+        </div>
+        <div style={{ marginBottom: "18px" }}>
+          <input
+            id="import-duplas-csv"
+            type="file"
+            accept=".pdf,.csv,.xls,.xlsx,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={importarDuplasCsv}
+            disabled={provaFinalizada}
+            style={{ display: "none" }}
+          />
+          <label
+            htmlFor="import-duplas-csv"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "100%",
+              minHeight: "48px",
+              borderRadius: "12px",
+              background: provaFinalizada ? "#2A2A2A" : "#22C55E",
+              color: "#fff",
+              fontWeight: 700,
+              cursor: provaFinalizada ? "not-allowed" : "pointer",
+              border: "1px solid #2A2A2A",
+              textAlign: "center",
+            }}
+          >
+            📁 Importar planilha de duplas
+          </label>
+        </div>
         <div style={{ display: "flex", gap: "10px" }}>
           <Btn variant="primary" size="lg" full onClick={cadastrarDupla} disabled={provaFinalizada} style={{ opacity: provaFinalizada ? 0.5 : 1, cursor: provaFinalizada ? "not-allowed" : "pointer" }}>
             {editandoId ? "💾 Salvar Alteração" : "✅ Cadastrar Dupla"}
@@ -60,7 +94,7 @@ export default function AbaCadastro({
           <div style={{ width: "28px", height: "28px", borderRadius: "6px", background: "#C98A2E22", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: "#C98A2E", fontSize: "13px", flexShrink: 0 }}>{i + 1}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 600, fontSize: "13px", color: "#F0F0F0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🤠 {dp.cavaleiro1} <span style={{ color: "#C98A2E" }}>✦</span> {dp.cavaleiro2}</div>
-            <div style={{ fontSize: "11px", color: "#444", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🐴 {dp.cavalo1} · {dp.cavalo2}</div>
+            <div style={{ fontSize: "11px", color: "#444", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🐴 {dp.cavalo1 || "—"} · {dp.cavalo2 || "—"}</div>
           </div>
           {duplaConcluida(dp) ? (
             <div style={{ flexShrink: 0, textAlign: "right" }}>
@@ -69,6 +103,8 @@ export default function AbaCadastro({
             </div>
           ) : null}
           <div style={{ display: "flex", gap: "5px", flexShrink: 0 }}>
+            <Btn variant="secondary" size="sm" onClick={() => moverDupla(dp.id, -1)} disabled={provaFinalizada || i === 0} style={{ opacity: provaFinalizada || i === 0 ? 0.4 : 1, cursor: provaFinalizada || i === 0 ? "not-allowed" : "pointer" }}>⬆️</Btn>
+            <Btn variant="secondary" size="sm" onClick={() => moverDupla(dp.id, 1)} disabled={provaFinalizada || i === duplas.length - 1} style={{ opacity: provaFinalizada || i === duplas.length - 1 ? 0.4 : 1, cursor: provaFinalizada || i === duplas.length - 1 ? "not-allowed" : "pointer" }}>⬇️</Btn>
             <Btn variant="secondary" size="sm" onClick={() => { if (provaFinalizada) return toast("Prova finalizada. Não é permitido alterar duplas.", "erro"); editarDupla(dp); }} disabled={provaFinalizada} style={{ opacity: provaFinalizada ? 0.4 : 1, cursor: provaFinalizada ? "not-allowed" : "pointer" }}>✏️</Btn>
             <Btn variant="danger" size="sm" onClick={() => removerDupla(dp.id)} disabled={provaFinalizada} style={{ opacity: provaFinalizada ? 0.4 : 1, cursor: provaFinalizada ? "not-allowed" : "pointer" }}>🗑️</Btn>
           </div>

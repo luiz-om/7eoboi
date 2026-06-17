@@ -57,7 +57,7 @@ export default function RanchSortingApp() {
     editandoId, editandoResultadoId, setEditandoResultadoId, editandoProvaId,
     handleSignIn, handleSignUp, handleSignOut,
     resetarFormProva, salvarProva, editarProva, selecionarProva, removerProva, finalizarProva,
-    cadastrarDupla, editarDupla, cancelarEdicao, removerDupla,
+    cadastrarDupla, editarDupla, cancelarEdicao, removerDupla, moverDupla,
     salvarResultado, iniciarEdicaoResultado, cancelarEdicaoResultado, limparResultado,
     registrarSAT, finalizarDuplaAtual,
     exportarRankingProva, exportarResultadosExcel, copiarResultadoWhatsApp, imprimirCertificadoCavalo,
@@ -65,6 +65,7 @@ export default function RanchSortingApp() {
     medalhas, fmt, provaFinalizada,
     cavalosPremiadosDaProva, rankingCavalosDaProva, rankingCavalosGeral, rankingCompleto,
     formatarData, formatarBois, duplaConcluida, duplaSat,
+    importarDuplasCsv,
     gerarListaRankingCompleta, gerarRanking,
   } = prova;
 
@@ -248,6 +249,8 @@ export default function RanchSortingApp() {
             editandoId={editandoId} provaFinalizada={provaFinalizada}
             cadastrarDupla={cadastrarDupla} editarDupla={editarDupla}
             cancelarEdicao={cancelarEdicao} removerDupla={removerDupla}
+            importarDuplasCsv={importarDuplasCsv}
+            moverDupla={moverDupla}
             formatarData={formatarData} formatarBois={formatarBois}
             duplaConcluida={duplaConcluida} duplaSat={duplaSat}
             fmt={fmt} toast={toast}

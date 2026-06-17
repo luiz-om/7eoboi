@@ -10,6 +10,7 @@ import {
   signOut,
   signUpWithEmail,
   updateDupla,
+  updateDuplaOrdem,
   updateProva,
   updateResultadoDupla,
 } from "../lib/ranchSortingApi";
@@ -25,6 +26,8 @@ import {
   listarCavalosPremiados,
 } from "../lib/ranchSortingUtils";
 import { supabase } from "../lib/supabase";
+import * as XLSX from "xlsx";
+import pdfWorkerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 
 export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao }) {
   const [sessao, setSessao] = useState(null);
@@ -47,6 +50,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
   const [editandoId, setEditandoId] = useState(null);
   const [editandoResultadoId, setEditandoResultadoId] = useState(null);
   const [editandoProvaId, setEditandoProvaId] = useState(null);
+  const [importandoDuplasCsv, setImportandoDuplasCsv] = useState(false);
 
   // ✅ useRef para timeout evita stale closure
   const timeoutRef = useRef(null);
@@ -291,6 +295,493 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     });
   }
 
+  function splitLineIntoCompetitors(linha) {
+    const normalize = (valor) => String(valor).trim().replace(/^"|"$/g, "");
+    const trySplit = (text, splitter) =>
+      text
+        .split(splitter)
+        .map(normalize)
+        .filter((valor) => valor.length > 0);
+
+    const candidates = [
+      trySplit(linha, /\t/),
+      trySplit(linha, /\|/),
+      trySplit(linha, / {3,}/),
+      trySplit(linha, / {2,}/),
+      trySplit(linha, /;/),
+      trySplit(linha, /,/),
+    ];
+
+    for (const cols of candidates) {
+      if (cols.length === 2) return cols;
+      if (cols.length > 2) {
+        const midpoint = Math.ceil(cols.length / 2);
+        const first = cols.slice(0, midpoint).join(" ");
+        const second = cols.slice(midpoint).join(" ");
+        if (first && second) return [first, second];
+      }
+    }
+
+    const words = linha.split(/\s+/).map(normalize).filter(Boolean);
+    if (words.length >= 2) {
+      const half = Math.floor(words.length / 2);
+      const first = words.slice(0, half).join(" ");
+      const second = words.slice(half).join(" ");
+      if (first && second) return [first, second];
+    }
+
+    return null;
+  }
+
+  function groupPdfLines(content) {
+    const items = content.items
+      .map((item) => {
+        const transform = item.transform || [];
+        return {
+          str: item.str || "",
+          x: transform[4] || 0,
+          y: transform[5] || 0,
+        };
+      })
+      .filter((item) => item.str.trim().length > 0);
+
+    const linhas = [];
+    items.sort((a, b) => b.y - a.y || a.x - b.x).forEach((item) => {
+      const linhaExistente = linhas.find((linha) => Math.abs(linha.y - item.y) < 4);
+      if (linhaExistente) {
+        linhaExistente.items.push(item);
+      } else {
+        linhas.push({ y: item.y, items: [item] });
+      }
+    });
+
+    return linhas
+      .sort((a, b) => b.y - a.y)
+      .map((linha) => ({
+        y: linha.y,
+        items: linha.items.sort((a, b) => a.x - b.x),
+      }));
+  }
+
+  function isValidCompetitorName(value) {
+    if (!value || typeof value !== "string") return false;
+    const normalized = value.trim();
+    if (normalized.length < 6) return false;
+    if (!/[A-Za-zÀ-ÿ]/.test(normalized)) return false;
+    if (/\d/.test(normalized)) return false;
+    if (/[:@#\$%\^&\*\(\)_=\+\[\]\{\};"<>\/\\]/.test(normalized)) return false;
+    if (/\b(hora|etapa|copa|evento|data|endereco|cidade|prova|classific|gerenciador|manejo|passada|competidor|cavaleiro|tira boi|tempo|sort\.?|hora:)\b/i.test(normalized)) return false;
+    const words = normalized.split(/\s+/);
+    if (words.length < 2) return false;
+    return words.every((word) => /^[A-Za-zÀ-ÿ'’.\-]+$/.test(word));
+  }
+
+  function splitLineColumns(line) {
+    const text = String(line ?? "").trim();
+    if (!text) return [];
+
+    const splitDelimited = (value) =>
+      String(value)
+        .split(/[;,](?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)/)
+        .map((col) => col.trim().replace(/^"|"$/g, ""))
+        .filter(Boolean);
+
+    if (text.includes("\t")) {
+      return text.split("\t").map((col) => col.trim()).filter(Boolean);
+    }
+    if (/[;,]/.test(text)) {
+      return splitDelimited(text);
+    }
+    const spaced = text.split(/ {2,}/).map((col) => col.trim()).filter(Boolean);
+    if (spaced.length >= 3) return spaced;
+    const match = text.match(/^(\d+)\s+(.+?)\s{2,}(.+)$/);
+    if (match) return [match[1].trim(), match[2].trim(), match[3].trim()];
+    return text.split(/\s+/).map((col) => col.trim()).filter(Boolean);
+  }
+
+  function extractCompetitorsFromPdfLines(lines) {
+    const competitors = [];
+    const ignorePattern = /^(page\s*\d+|competidor\s*1?|competidor\s*2?|cavaleiro\s*1?|cavaleiro\s*2?|hora|etapa|classific|data|campo grande|ms de ranch sorting|tira boi|3ª copa apa|resultado|nome da equipe|cidade|uf|classifica|obs|observa)/i;
+
+    const headerLineIndex = lines.findIndex((line) => {
+      const text = line.items.map((item) => item.str).join(" ");
+      const passFound = /passada/i.test(text);
+      const competitorCount = line.items.filter((item) => /competidor|cavaleiro/i.test(item.str)).length;
+      return passFound && competitorCount >= 2;
+    });
+    if (headerLineIndex < 0) return [];
+
+    const headerLine = lines[headerLineIndex];
+    const sortedHeaders = headerLine.items.sort((a, b) => a.x - b.x);
+    const passHeader = sortedHeaders.find((item) => /passada/i.test(item.str));
+    const competitorHeaders = sortedHeaders.filter((item) => /competidor|cavaleiro/i.test(item.str));
+    if (!passHeader || competitorHeaders.length < 2) return [];
+
+    const comp1Header = competitorHeaders[0];
+    const comp2Header = competitorHeaders[1];
+    const nextHeader = sortedHeaders.find((item) => item.x > comp2Header.x && !/competidor|cavaleiro|passada/i.test(item.str));
+
+    const passBoundary = (passHeader.x + comp1Header.x) / 2;
+    const comp1Boundary = (comp1Header.x + comp2Header.x) / 2;
+    const comp2Boundary = nextHeader ? (comp2Header.x + nextHeader.x) / 2 : Infinity;
+
+    let currentRow = null;
+
+    for (let i = headerLineIndex + 1; i < lines.length; i += 1) {
+      const line = lines[i];
+      const lineText = line.items.map((item) => item.str.trim()).join(" ").trim();
+      if (!lineText || ignorePattern.test(lineText)) continue;
+
+      const passMatch = lineText.match(/^\s*(\d+)\s+(.*)$/);
+      const passValue = passMatch ? passMatch[1] : "";
+      const contentText = passMatch ? passMatch[2].trim() : lineText;
+      const cols = splitLineColumns(contentText);
+      const comp1 = cols[0] || "";
+      const comp2 = cols.slice(1).join(" ").trim();
+
+      const hasPass = Boolean(passValue);
+      const comp1IsValid = isValidCompetitorName(comp1);
+      const comp2IsValid = isValidCompetitorName(comp2);
+
+      if (hasPass) {
+        if (currentRow && currentRow.cavaleiro1 && currentRow.cavaleiro2) {
+          competitors.push({ cavaleiro1: currentRow.cavaleiro1, cavaleiro2: currentRow.cavaleiro2 });
+        }
+        currentRow = {
+          passValue,
+          cavaleiro1: comp1IsValid ? comp1 : "",
+          cavaleiro2: comp2IsValid ? comp2 : "",
+        };
+        continue;
+      }
+
+      if (!currentRow) continue;
+      if (!comp1IsValid && !comp2IsValid) continue;
+      if (currentRow.cavaleiro1 && currentRow.cavaleiro2) {
+        continue;
+      }
+
+      const appendFragment = (target, fragment) => {
+        if (!fragment || !fragment.trim()) return target;
+        if (!target) return fragment.trim();
+        return `${target} ${fragment.trim()}`;
+      };
+
+      if (!currentRow.cavaleiro1 && comp1IsValid) {
+        currentRow.cavaleiro1 = comp1;
+      }
+      if (!currentRow.cavaleiro2 && comp2IsValid) {
+        currentRow.cavaleiro2 = comp2;
+      }
+    }
+
+    if (currentRow && currentRow.passValue && isValidCompetitorName(currentRow.cavaleiro1) && isValidCompetitorName(currentRow.cavaleiro2)) {
+      competitors.push({ cavaleiro1: currentRow.cavaleiro1, cavaleiro2: currentRow.cavaleiro2 });
+    }
+
+    return competitors;
+  }
+
+  function normalizeCell(value) {
+    return String(value ?? "").trim();
+  }
+
+  function normalizeHeader(value) {
+    return normalizeCell(value).toLowerCase().replace(/\s+/g, " ");
+  }
+
+  function parseCompetidoresFromRows(rows) {
+    if (!Array.isArray(rows) || !rows.length) return [];
+
+    const normalizedRows = rows.map((row) => (Array.isArray(row) ? row.map(normalizeCell) : []));
+    const headerIndex = normalizedRows.findIndex((row) => {
+      const headers = row.map(normalizeHeader);
+      return (
+        headers.filter((cell) => /(competidor|campetidor|cavaleiro|competitor)/i.test(cell)).length >= 2 ||
+        headers.some((cell) => /\bpassada\b/i.test(cell) || /\bpass\b/i.test(cell))
+      );
+    });
+
+    if (headerIndex < 0) return [];
+
+    const headerCells = normalizedRows[headerIndex].map(normalizeHeader);
+    const passIndex = headerCells.findIndex((cell) => /\bpassada\b/i.test(cell) || /\bpass\b/i.test(cell));
+    const competitorIndexes = headerCells
+      .map((cell, index) => (/(competidor|campetidor|cavaleiro|competitor)/i.test(cell) ? index : -1))
+      .filter((index) => index >= 0)
+      .slice(0, 2);
+
+    if (competitorIndexes.length < 2) {
+      // fallback: take first two non-empty columns if header row is not sufficiently labeled
+      const nonEmptyIndexes = headerCells.map((cell, index) => (cell ? index : -1)).filter((index) => index >= 0);
+      if (nonEmptyIndexes.length >= 2) {
+        competitorIndexes.push(nonEmptyIndexes[0], nonEmptyIndexes[1]);
+      }
+    }
+
+    if (competitorIndexes.length < 2) return [];
+
+    const competitors = [];
+    for (let i = headerIndex + 1; i < normalizedRows.length; i += 1) {
+      const row = normalizedRows[i];
+      if (!row || row.every((item) => !item)) continue;
+
+      const cavaleiro1 = normalizeCell(row[competitorIndexes[0]] ?? "");
+      const cavaleiro2 = normalizeCell(row[competitorIndexes[1]] ?? "");
+      if (!isValidCompetitorName(cavaleiro1) || !isValidCompetitorName(cavaleiro2)) continue;
+
+      if (passIndex >= 0) {
+        const passValue = String(row[passIndex] ?? "").trim();
+        if (!/^\d+$/.test(passValue)) continue;
+      }
+
+      competitors.push({ cavaleiro1, cavaleiro2 });
+    }
+
+    return dedupeCompetidores(competitors);
+  }
+
+  function parseCompetidoresTexto(text) {
+    const linhas = String(text)
+      .split(/\r?\n/)
+      .map((linha) => linha.trim())
+      .filter((linha) => linha.length > 0 && !/^page\s*\d+$/i.test(linha));
+
+    if (!linhas.length) return [];
+
+    const rows = linhas.map(splitLineColumns).filter((cols) => cols.length > 0);
+    const parsedFromRows = parseCompetidoresFromRows(rows);
+    if (parsedFromRows.length > 0) {
+      return parsedFromRows;
+    }
+
+    return parseCompetidoresTextoFromLines(linhas);
+  }
+
+  function parseCompetidoresTextoFromLines(linhas) {
+    const headerIndex = linhas.findIndex((linha) => /passada|competidor 1|competidor 2|competidor|cavaleiro 1|cavaleiro 2|cavaleiro/i.test(linha));
+    if (headerIndex < 0) return [];
+
+    const headerLine = linhas[headerIndex];
+    const headerCols = splitLineColumns(headerLine);
+    const passIndex = headerCols.findIndex((valor) => /passada/i.test(valor));
+    const competitorIndexes = headerCols
+      .map((valor, index) => (/competidor|cavaleiro/i.test(valor) ? index : -1))
+      .filter((index) => index >= 0)
+      .slice(0, 2);
+
+    if (passIndex < 0 || competitorIndexes.length !== 2) return [];
+
+    const rows = [];
+    let currentRow = null;
+
+    const pushCurrentRow = () => {
+      if (!currentRow) return;
+      if (
+        currentRow.passValue &&
+        isValidCompetitorName(currentRow.cavaleiro1) &&
+        isValidCompetitorName(currentRow.cavaleiro2)
+      ) {
+        rows.push({ cavaleiro1: currentRow.cavaleiro1, cavaleiro2: currentRow.cavaleiro2 });
+      }
+      currentRow = null;
+    };
+
+    const appendFragment = (target, fragment) => {
+      if (!fragment || !fragment.trim()) return target;
+      if (!target) return fragment.trim();
+      return `${target} ${fragment.trim()}`;
+    };
+
+    for (let i = headerIndex + 1; i < linhas.length; i += 1) {
+      const linha = linhas[i];
+      const cols = splitLineColumns(linha);
+      const passValue = cols[passIndex] && /^\d+$/.test(cols[passIndex]) ? cols[passIndex] : "";
+
+      if (passValue) {
+        pushCurrentRow();
+        currentRow = { passValue, cavaleiro1: "", cavaleiro2: "" };
+        const cav1 = cols[competitorIndexes[0]] || "";
+        const cav2 = cols[competitorIndexes[1]] || "";
+        if (isValidCompetidorName(cav1)) currentRow.cavaleiro1 = cav1;
+        if (isValidCompetidorName(cav2)) currentRow.cavaleiro2 = cav2;
+        continue;
+      }
+
+      if (!currentRow) continue;
+
+      if (cols.length === 1) {
+        const fragment = cols[0];
+        if (!currentRow.cavaleiro2) {
+          currentRow.cavaleiro2 = appendFragment(currentRow.cavaleiro2, fragment);
+        } else if (!currentRow.cavaleiro1) {
+          currentRow.cavaleiro1 = appendFragment(currentRow.cavaleiro1, fragment);
+        }
+        continue;
+      }
+
+      if (cols.length >= 2) {
+        const maybeFirst = cols[0];
+        const maybeSecond = cols[1];
+        if (!currentRow.cavaleiro1 && isValidCompetidorName(maybeFirst)) {
+          currentRow.cavaleiro1 = appendFragment(currentRow.cavaleiro1, maybeFirst);
+        }
+        if (!currentRow.cavaleiro2 && isValidCompetidorName(maybeSecond)) {
+          currentRow.cavaleiro2 = appendFragment(currentRow.cavaleiro2, maybeSecond);
+        }
+      }
+    }
+
+    pushCurrentRow();
+    return rows;
+  }
+
+  function dedupeCompetidores(competitors) {
+    const seen = new Set();
+    return competitors.filter(({ cavaleiro1, cavaleiro2 }) => {
+      const chave = `${String(cavaleiro1).trim().toLowerCase()}|${String(cavaleiro2).trim().toLowerCase()}`;
+      if (seen.has(chave)) return false;
+      seen.add(chave);
+      return true;
+    });
+  }
+
+  function parseCompetidoresPdf(contents) {
+    if (!Array.isArray(contents)) return [];
+    const competitors = [];
+    for (const content of contents) {
+      const lines = groupPdfLines(content);
+      competitors.push(...extractCompetitorsFromPdfLines(lines));
+    }
+
+    const deduped = dedupeCompetidores(competitors);
+    if (deduped.length > 0) return deduped;
+
+    const texto = contents.flatMap((content) => extrairLinhasDoPdf(content)).join("\n");
+    return dedupeCompetidores(parseCompetidoresTexto(texto));
+  }
+
+  function parseCompetidoresExcel(arrayBuffer) {
+    const workbook = XLSX.read(arrayBuffer, { type: "array" });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) return [];
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: "" });
+    return parseCompetidoresFromRows(rows);
+  }
+
+  async function extrairConteudoPdf(arquivo) {
+    const arrayBuffer = await arquivo.arrayBuffer();
+    const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pages = [];
+    for (let i = 1; i <= pdf.numPages; i += 1) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      pages.push(content);
+    }
+    return pages;
+  }
+
+  function extrairLinhasDoPdf(content) {
+    const items = content.items
+      .map((item) => {
+        const transform = item.transform || [];
+        return {
+          str: item.str || "",
+          x: transform[4] || 0,
+          y: transform[5] || 0,
+        };
+      })
+      .filter((item) => item.str.trim().length > 0);
+
+    const linhas = [];
+    items.sort((a, b) => b.y - a.y || a.x - b.x).forEach((item) => {
+      const linhaExistente = linhas.find((linha) => Math.abs(linha.y - item.y) < 4);
+      if (linhaExistente) {
+        linhaExistente.items.push(item);
+      } else {
+        linhas.push({ y: item.y, items: [item] });
+      }
+    });
+
+    return linhas
+      .sort((a, b) => b.y - a.y)
+      .map((linha) => {
+        const row = linha.items.sort((a, b) => a.x - b.x);
+        return row.reduce((texto, item, index) => {
+          const anterior = row[index - 1];
+          if (!anterior) return item.str;
+          const espaco = item.x - anterior.x > Math.max(anterior.str.length * 4, 18) ? "\t" : " ";
+          return `${texto}${espaco}${item.str}`;
+        }, "");
+      });
+  }
+
+  async function extrairTextoPdf(arquivo) {
+    const arrayBuffer = await arquivo.arrayBuffer();
+    const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let texto = "";
+    for (let i = 1; i <= pdf.numPages; i += 1) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const lines = extrairLinhasDoPdf(content);
+      texto += `${lines.join("\n")}\n`;
+    }
+    return texto;
+  }
+
+  async function importarDuplasCsv(event) {
+    const arquivo = event?.target?.files?.[0];
+    if (!arquivo) return;
+    event.target.value = "";
+
+    if (!provaAtual) { toast("Cadastre ou selecione uma prova primeiro.", "erro"); return; }
+    if (provaFinalizada) { toast("Prova finalizada. Nao e permitido alterar duplas.", "erro"); return; }
+    const extensao = arquivo.name.toLowerCase().split(".").pop();
+    if (!["csv", "pdf", "xlsx", "xls"].includes(extensao)) { toast("Selecione um arquivo CSV, PDF ou Excel.", "erro"); return; }
+
+    try {
+      setImportandoDuplasCsv(true);
+      const competidores = extensao === "pdf"
+        ? await parseCompetidoresPdf(await extrairConteudoPdf(arquivo))
+        : ["xlsx", "xls"].includes(extensao)
+          ? parseCompetidoresExcel(await arquivo.arrayBuffer())
+          : parseCompetidoresTexto(await arquivo.text());
+      if (!competidores.length) {
+        toast("Arquivo vazio ou formato invalido. Use duas colunas com os nomes dos competidores.", "erro");
+        return;
+      }
+
+      const ordemBase = duplas.reduce((max, dp) => Math.max(max, dp.ordem || 0), 0);
+      for (let i = 0; i < competidores.length; i += 1) {
+        const { cavaleiro1, cavaleiro2 } = competidores[i];
+        await createDupla({
+          provaId: provaAtual.id,
+          ordem: ordemBase + i + 1,
+          cavaleiro1,
+          cavalo1: "",
+          cavaleiro2,
+          cavalo2: "",
+          status: "PENDENTE",
+          bois: null,
+          tempo: null,
+        });
+      }
+      await carregarDados(provaAtual.id);
+      toast(`${competidores.length} dupla(s) importadas com sucesso!`);
+    } catch (error) {
+      toast(error?.message || "Nao foi possivel importar as duplas.", "erro");
+    } finally {
+      setImportandoDuplasCsv(false);
+    }
+  }
+
   // ─── Dupla CRUD ────────────────────────────────────────────────────────────
 
   const provaAtual = provas.find((prova) => prova.id === provaAtualId) ?? null;
@@ -313,21 +804,64 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     if (!provaAtual) { toast("Cadastre ou selecione uma prova primeiro.", "erro"); return; }
     if (provaFinalizada) { toast("Prova finalizada. Nao e permitido alterar duplas.", "erro"); return; }
     const { cavaleiro1, cavalo1, cavaleiro2, cavalo2 } = form;
-    if (!cavaleiro1 || !cavalo1 || !cavaleiro2 || !cavalo2) { toast("Preencha todos os campos!", "erro"); return; }
+    if (!cavaleiro1 || !cavaleiro2) { toast("Informe os dois competidores.", "erro"); return; }
     try {
       if (editandoId) {
         const duplaAtual = duplas.find((dp) => dp.id === editandoId);
-        await updateDupla(editandoId, { cavaleiro1, cavalo1, cavaleiro2, cavalo2, status: duplaAtual?.status ?? "PENDENTE", bois: duplaAtual?.bois ?? null, tempo: duplaAtual?.tempo ?? null });
+        await updateDupla(editandoId, {
+          cavaleiro1,
+          cavalo1,
+          cavaleiro2,
+          cavalo2,
+          status: duplaAtual?.status ?? "PENDENTE",
+          bois: duplaAtual?.bois ?? null,
+          tempo: duplaAtual?.tempo ?? null,
+        });
         setEditandoId(null);
         toast("Dupla atualizada!");
       } else {
         const ordem = duplas.reduce((max, dp) => Math.max(max, dp.ordem || 0), 0) + 1;
-        await createDupla({ provaId: provaAtual.id, ordem, cavaleiro1, cavalo1, cavaleiro2, cavalo2, status: "PENDENTE", bois: null, tempo: null });
+        await createDupla({
+          provaId: provaAtual.id,
+          ordem,
+          cavaleiro1,
+          cavalo1,
+          cavaleiro2,
+          cavalo2,
+          status: "PENDENTE",
+          bois: null,
+          tempo: null,
+        });
         toast("Dupla cadastrada!");
       }
       setForm({ cavaleiro1: "", cavalo1: "", cavaleiro2: "", cavalo2: "" });
       await carregarDados(provaAtual.id);
     } catch (error) { toast(error.message || "Nao foi possivel salvar a dupla.", "erro"); }
+  }
+
+  async function moverDupla(id, direction) {
+    if (!provaAtual) { toast("Cadastre ou selecione uma prova primeiro.", "erro"); return; }
+    if (provaFinalizada) { toast("Prova finalizada. Nao e permitido alterar a ordem.", "erro"); return; }
+    const index = duplas.findIndex((dp) => dp.id === id);
+    if (index < 0) return;
+    const targetIndex = direction === -1 ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= duplas.length) return;
+
+    const current = duplas[index];
+    const target = duplas[targetIndex];
+    const currentOrder = current.ordem != null ? current.ordem : index + 1;
+    const targetOrder = target.ordem != null ? target.ordem : targetIndex + 1;
+
+    try {
+      const tempOrder = Math.max(currentOrder, targetOrder) + 1000;
+      await updateDuplaOrdem(target.id, tempOrder);
+      await updateDuplaOrdem(current.id, targetOrder);
+      await updateDuplaOrdem(target.id, currentOrder);
+      await carregarDados(provaAtual.id);
+      toast("Ordem da dupla atualizada!");
+    } catch (error) {
+      toast(error.message || "Nao foi possivel alterar a ordem da dupla.", "erro");
+    }
   }
 
   function editarDupla(dp) {
@@ -523,7 +1057,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     carregarDados,
     handleSignIn, handleSignUp, handleSignOut,
     resetarFormProva, salvarProva, editarProva, selecionarProva, removerProva, finalizarProva,
-    cadastrarDupla, editarDupla, cancelarEdicao, removerDupla,
+    cadastrarDupla, editarDupla, cancelarEdicao, removerDupla, moverDupla,
     salvarResultado, iniciarEdicaoResultado, cancelarEdicaoResultado, limparResultado,
     registrarSAT, finalizarDuplaAtual,
     exportarRankingProva, exportarResultadosExcel, copiarResultadoWhatsApp, imprimirCertificadoCavalo,
@@ -531,6 +1065,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     medalhas, fmt, provaFinalizada,
     cavalosPremiadosDaProva, rankingCavalosDaProva, rankingCavalosGeral, rankingCompleto,
     formatarData, formatarBois, duplaConcluida, duplaSat,
+    importarDuplasCsv,
     gerarRanking, gerarListaRankingCompleta,
   };
 }

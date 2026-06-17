@@ -8,6 +8,12 @@ function normalizarStatus(valor) {
   return "PENDENTE";
 }
 
+function mapearTextoVazio(valor) {
+  if (valor === null || valor === undefined) return "—";
+  const texto = String(valor).trim();
+  return texto === "" ? "—" : texto;
+}
+
 function mapearBoisParaBanco(valor) {
   if (valor === null || valor === undefined || valor === "") return null;
   const numero = Number(valor);
@@ -154,9 +160,9 @@ export async function createDupla(payload) {
       prova_id: payload.provaId,
       ordem: payload.ordem,
       cavaleiro1: payload.cavaleiro1,
-      cavalo1: payload.cavalo1,
+      cavalo1: mapearTextoVazio(payload.cavalo1),
       cavaleiro2: payload.cavaleiro2,
-      cavalo2: payload.cavalo2,
+      cavalo2: mapearTextoVazio(payload.cavalo2),
       status: payload.status ?? "PENDENTE",
       bois: mapearBoisParaBanco(payload.bois),
       tempo: payload.tempo,
@@ -169,22 +175,40 @@ export async function createDupla(payload) {
 }
 
 export async function updateDupla(id, payload) {
+  const updateFields = {
+    cavaleiro1: payload.cavaleiro1,
+    cavalo1: mapearTextoVazio(payload.cavalo1),
+    cavaleiro2: payload.cavaleiro2,
+    cavalo2: mapearTextoVazio(payload.cavalo2),
+    status: payload.status ?? "PENDENTE",
+    bois: mapearBoisParaBanco(payload.bois),
+    tempo: payload.tempo,
+  };
+
+  if (payload.ordem != null) {
+    updateFields.ordem = payload.ordem;
+  }
+
   const { data, error } = await supabase
     .from("duplas")
-    .update({
-      cavaleiro1: payload.cavaleiro1,
-      cavalo1: payload.cavalo1,
-      cavaleiro2: payload.cavaleiro2,
-      cavalo2: payload.cavalo2,
-      status: payload.status ?? "PENDENTE",
-      bois: mapearBoisParaBanco(payload.bois),
-      tempo: payload.tempo,
-    })
+    .update(updateFields)
     .eq("id", id)
     .select(DUPLAS_COLUMNS)
     .single();
 
   if (error) throw tratarErro(error, "Nao foi possivel atualizar a dupla.");
+  return normalizarDupla(data);
+}
+
+export async function updateDuplaOrdem(id, ordem) {
+  const { data, error } = await supabase
+    .from("duplas")
+    .update({ ordem })
+    .eq("id", id)
+    .select(DUPLAS_COLUMNS)
+    .single();
+
+  if (error) throw tratarErro(error, "Nao foi possivel atualizar a ordem da dupla.");
   return normalizarDupla(data);
 }
 
