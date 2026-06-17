@@ -222,18 +222,19 @@ const ArenaScreen = memo(function ArenaScreen({
           display: flex; flex-direction: column; justify-content: center;
           padding: clamp(10px, 2vh, 28px) clamp(12px, 3vw, 40px);
           max-width: 1600px; width: 100%; margin: 0 auto;
-          overflow: hidden;
+          overflow: visible;
         }
 
         /* ── TIMER ────────────────────────────────────────── */
         .arena-timer-container {
           text-align: center;
-          margin-bottom: clamp(8px, 2vh, 28px);
+          margin: clamp(28px, 5.5vh, 62px) auto clamp(8px, 2vh, 28px);
           flex-shrink: 0;
+          overflow: visible;
         }
         .arena-timer-row {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           justify-content: center;
           gap: clamp(16px, 3vw, 56px);
         }
@@ -241,9 +242,11 @@ const ArenaScreen = memo(function ArenaScreen({
           font-size: clamp(49px, 12.35vw, 171px);
           font-family: 'Courier New', monospace;
           font-weight: 800; color: #22C55E;
-          letter-spacing: -4px; line-height: 0.9;
+          letter-spacing: -4px; line-height: 1.05;
+          display: inline-block;
           text-shadow: 0 0 30px rgba(34,197,94,0.3);
           transition: text-shadow 0.3s;
+          overflow: visible;
         }
         .arena-timer-running {
           text-shadow: 0 0 60px rgba(34,197,94,0.7), 0 0 20px rgba(34,197,94,0.5);
@@ -303,13 +306,14 @@ const ArenaScreen = memo(function ArenaScreen({
           gap: clamp(10px, 2vw, 24px);
           align-items: stretch;
           min-width: 0;
+          margin-top: clamp(-12px, -2.2vh, -30px);
         }
         .arena-competitors-wrapper > .arena-next {
           min-width: 0; overflow: hidden;
         }
         .arena-next {
           border-radius: 16px;
-          padding: clamp(14px, 2vw, 28px);
+          padding: clamp(1px, 1.2vw, 1px) clamp(14px, 1vw, 28px) clamp(10px, 1.4vw, 16px);
           display: flex; flex-direction: column; justify-content: center;
         }
         .arena-current-highlight {
@@ -329,6 +333,7 @@ const ArenaScreen = memo(function ArenaScreen({
           font-size: clamp(12px, 1.6vw, 26px);
           font-weight: 700; color: #22C55E;
           letter-spacing: 2px; text-transform: uppercase;
+          margin-bottom: clamp(4px, 0.8vh, 8px);
           margin-bottom: clamp(6px, 1.2vh, 18px);
         }
         .arena-next-label.secondary { color: #C98A2E; }
@@ -336,24 +341,18 @@ const ArenaScreen = memo(function ArenaScreen({
           font-size: clamp(20px, 2.8vw, 52px);
           font-weight: 700; color: #F0F0F0; line-height: 1.2;
           margin-bottom: clamp(4px, 1vh, 12px);
-          display: -webkit-box;
-          -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-          overflow: hidden; text-overflow: ellipsis;
           overflow-wrap: anywhere; word-break: break-word; white-space: normal;
         }
         .secondary-riders {
           font-size: clamp(16px, 2.2vw, 38px);
           color: #C98A2E;
-          display: -webkit-box;
-          -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-          overflow: hidden; text-overflow: ellipsis;
           overflow-wrap: anywhere; word-break: break-word; white-space: normal;
         }
         .arena-separator { color: #555; margin: 0 6px; }
         .arena-next-horses {
           font-size: clamp(11px, 1.4vw, 22px);
           color: #888; font-weight: 500;
-          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          white-space: normal; overflow-wrap: anywhere; word-break: break-word;
         }
 
         /* ── RANKING (durante a prova) ────────────────────── */
@@ -404,14 +403,17 @@ const ArenaScreen = memo(function ArenaScreen({
         }
         .arena-rank-team { min-width: 0; overflow: hidden; }
         .arena-rank-name {
-          font-size: clamp(13px, 1.5vw, 24px);
-          font-weight: 700; color: #F0F0F0; line-height: 1.1;
-          overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+          font-size: clamp(11px, 1.1vw, 20px);
+          font-weight: 700; color: #F0F0F0; line-height: 1.15;
+          overflow-wrap: anywhere; word-break: break-word;
+          white-space: normal; min-width: 0;
+          max-height: calc(1.15em * 2);
         }
         .arena-rank-horses {
-          font-size: clamp(10px, 1vw, 16px);
+          font-size: clamp(9px, 0.9vw, 14px);
           color: #666; margin-top: 3px;
-          overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+          overflow-wrap: anywhere; word-break: break-word;
+          white-space: normal; min-width: 0;
         }
         .arena-rank-stats { text-align: right; flex-shrink: 0; }
         .arena-rank-bois {
