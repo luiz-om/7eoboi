@@ -228,7 +228,7 @@ const ArenaScreen = memo(function ArenaScreen({
         /* ── TIMER ────────────────────────────────────────── */
         .arena-timer-container {
           text-align: center;
-          margin: clamp(28px, 5.5vh, 62px) auto clamp(8px, 2vh, 28px);
+          margin: clamp(96px, 18vh, 200px) auto clamp(8px, 2vh, 28px);
           flex-shrink: 0;
           overflow: visible;
         }
@@ -304,17 +304,19 @@ const ArenaScreen = memo(function ArenaScreen({
           display: grid;
           grid-template-columns: 2fr 1fr;
           gap: clamp(10px, 2vw, 24px);
-          align-items: stretch;
+          align-items: start;
           min-width: 0;
           margin-top: clamp(-12px, -2.2vh, -30px);
         }
         .arena-competitors-wrapper > .arena-next {
-          min-width: 0; overflow: hidden;
+          min-width: 0; min-height: 0; overflow: hidden;
+          align-self: start;
         }
         .arena-next {
           border-radius: 16px;
-          padding: clamp(1px, 1.2vw, 1px) clamp(14px, 1vw, 28px) clamp(10px, 1.4vw, 16px);
-          display: flex; flex-direction: column; justify-content: center;
+          min-height: 0;
+          padding: clamp(1px, 0.2vw, 4px) clamp(14px, 2vw, 28px) clamp(10px, 1.4vw, 16px);
+          display: flex; flex-direction: column; justify-content: start;
         }
         .arena-current-highlight {
           background: linear-gradient(135deg, #0F2F0F 0%, #1A4A1A 100%);
@@ -333,18 +335,17 @@ const ArenaScreen = memo(function ArenaScreen({
           font-size: clamp(12px, 1.6vw, 26px);
           font-weight: 700; color: #22C55E;
           letter-spacing: 2px; text-transform: uppercase;
-          margin-bottom: clamp(4px, 0.8vh, 8px);
-          margin-bottom: clamp(6px, 1.2vh, 18px);
+          margin-bottom: clamp(6px, 1.2vh, 1px);
         }
         .arena-next-label.secondary { color: #C98A2E; }
         .arena-next-riders {
-          font-size: clamp(20px, 2.8vw, 52px);
-          font-weight: 700; color: #F0F0F0; line-height: 1.2;
-          margin-bottom: clamp(4px, 1vh, 12px);
+          font-size: clamp(16px, 2vw, 40px);
+          font-weight: 700; color: #F0F0F0; line-height: 1.1;
+          margin-bottom: clamp(4px, 1vh, 8px);
           overflow-wrap: anywhere; word-break: break-word; white-space: normal;
         }
         .secondary-riders {
-          font-size: clamp(16px, 2.2vw, 38px);
+          font-size: clamp(14px, 1.6vw, 32px);
           color: #C98A2E;
           overflow-wrap: anywhere; word-break: break-word; white-space: normal;
         }
