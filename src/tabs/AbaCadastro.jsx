@@ -11,7 +11,6 @@ export default function AbaCadastro({
   editarDupla,
   cancelarEdicao,
   removerDupla,
-  moverDupla,
   importarDuplasCsv,
   formatarData,
   formatarBois,
@@ -103,8 +102,6 @@ export default function AbaCadastro({
             </div>
           ) : null}
           <div style={{ display: "flex", gap: "5px", flexShrink: 0 }}>
-            <Btn variant="secondary" size="sm" onClick={() => moverDupla(dp.id, -1)} disabled={provaFinalizada || i === 0} style={{ opacity: provaFinalizada || i === 0 ? 0.4 : 1, cursor: provaFinalizada || i === 0 ? "not-allowed" : "pointer" }}>⬆️</Btn>
-            <Btn variant="secondary" size="sm" onClick={() => moverDupla(dp.id, 1)} disabled={provaFinalizada || i === duplas.length - 1} style={{ opacity: provaFinalizada || i === duplas.length - 1 ? 0.4 : 1, cursor: provaFinalizada || i === duplas.length - 1 ? "not-allowed" : "pointer" }}>⬇️</Btn>
             <Btn variant="secondary" size="sm" onClick={() => { if (provaFinalizada) return toast("Prova finalizada. Não é permitido alterar duplas.", "erro"); editarDupla(dp); }} disabled={provaFinalizada} style={{ opacity: provaFinalizada ? 0.4 : 1, cursor: provaFinalizada ? "not-allowed" : "pointer" }}>✏️</Btn>
             <Btn variant="danger" size="sm" onClick={() => removerDupla(dp.id)} disabled={provaFinalizada} style={{ opacity: provaFinalizada ? 0.4 : 1, cursor: provaFinalizada ? "not-allowed" : "pointer" }}>🗑️</Btn>
           </div>

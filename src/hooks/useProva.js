@@ -10,7 +10,6 @@ import {
   signOut,
   signUpWithEmail,
   updateDupla,
-  updateDuplaOrdem,
   updateProva,
   updateResultadoDupla,
 } from "../lib/ranchSortingApi";
@@ -839,31 +838,6 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     } catch (error) { toast(error.message || "Nao foi possivel salvar a dupla.", "erro"); }
   }
 
-  async function moverDupla(id, direction) {
-    if (!provaAtual) { toast("Cadastre ou selecione uma prova primeiro.", "erro"); return; }
-    if (provaFinalizada) { toast("Prova finalizada. Nao e permitido alterar a ordem.", "erro"); return; }
-    const index = duplas.findIndex((dp) => dp.id === id);
-    if (index < 0) return;
-    const targetIndex = direction === -1 ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= duplas.length) return;
-
-    const current = duplas[index];
-    const target = duplas[targetIndex];
-    const currentOrder = current.ordem != null ? current.ordem : index + 1;
-    const targetOrder = target.ordem != null ? target.ordem : targetIndex + 1;
-
-    try {
-      const tempOrder = Math.max(currentOrder, targetOrder) + 1000;
-      await updateDuplaOrdem(target.id, tempOrder);
-      await updateDuplaOrdem(current.id, targetOrder);
-      await updateDuplaOrdem(target.id, currentOrder);
-      await carregarDados(provaAtual.id);
-      toast("Ordem da dupla atualizada!");
-    } catch (error) {
-      toast(error.message || "Nao foi possivel alterar a ordem da dupla.", "erro");
-    }
-  }
-
   function editarDupla(dp) {
     if (provaFinalizada) { toast("Prova finalizada. Nao e permitido alterar duplas.", "erro"); return; }
     setForm({ cavaleiro1: dp.cavaleiro1, cavalo1: dp.cavalo1, cavaleiro2: dp.cavaleiro2, cavalo2: dp.cavalo2 });
@@ -1057,7 +1031,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     carregarDados,
     handleSignIn, handleSignUp, handleSignOut,
     resetarFormProva, salvarProva, editarProva, selecionarProva, removerProva, finalizarProva,
-    cadastrarDupla, editarDupla, cancelarEdicao, removerDupla, moverDupla,
+    cadastrarDupla, editarDupla, cancelarEdicao, removerDupla,
     salvarResultado, iniciarEdicaoResultado, cancelarEdicaoResultado, limparResultado,
     registrarSAT, finalizarDuplaAtual,
     exportarRankingProva, exportarResultadosExcel, copiarResultadoWhatsApp, imprimirCertificadoCavalo,
