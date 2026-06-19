@@ -25,7 +25,7 @@ import {
   listarCavalosPremiados,
 } from "../lib/ranchSortingUtils";
 import { supabase } from "../lib/supabase";
-import { importDuplasFromPdf, mapearDuplasImportadas } from "../lib/importDuplasApi";
+import { importDuplasFromPdf, isPdfFile, mapearDuplasImportadas } from "../lib/importDuplasApi";
 
 export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao }) {
   const [sessao, setSessao] = useState(null);
@@ -326,9 +326,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
       return;
     }
 
-    const extensao = arquivo.name.toLowerCase().split(".").pop();
-    const mimePdf = arquivo.type === "application/pdf" || arquivo.type === "application/x-pdf";
-    if (extensao !== "pdf" && !mimePdf) {
+    if (!(await isPdfFile(arquivo))) {
       toast("Formato de PDF não reconhecido.", "erro");
       return;
     }
