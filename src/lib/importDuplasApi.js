@@ -18,14 +18,15 @@ function extrairMensagemErro(data, fallback) {
 }
 
 export async function importDuplasFromPdf(file) {
-  const formData = new FormData();
-  formData.append("file", file);
-
   let response;
   try {
     response = await fetch(`${getImportApiBase()}/api/import-duplas`, {
       method: "POST",
-      body: formData,
+      headers: {
+        "Content-Type": file.type || "application/pdf",
+        "X-Filename": file.name,
+      },
+      body: file,
     });
   } catch {
     throw new Error("Não foi possível ler o PDF.");

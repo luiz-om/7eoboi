@@ -1,7 +1,8 @@
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
 
-from api.pdf_parser import parse_duplas_pdf
+from api.import_service import ImportDuplasError, import_pdf_bytes
 
 app = FastAPI(title="7eoboi Import API")
 
@@ -20,33 +21,24 @@ def health() -> dict:
 
 
 @app.post("/api/import-duplas")
-async def import_duplas(file: UploadFile = File(...)) -> dict:
-    filename = (file.filename or "").lower()
-    content_type = (file.content_type or "").lower()
-
-    if not filename.endswith(".pdf") and content_type not in {"application/pdf", "application/x-pdf"}:
-        raise HTTPException(status_code=400, detail="Formato de PDF não reconhecido.")
-
+async def import_duplas(
+    request: Request,
+    file: UploadFile | None = File(None),
+) -> dict:
     try:
-        pdf_bytes = await file.read()
+        if file is not None and (file.filename or file.content_type):
+            pdf_bytes = await file.read()
+            return import_pdf_bytes(
+                pdf_bytes,
+                filename=file.filename or "",
+                content_type=file.content_type or "",
+            )
+
+        content_type = request.headers.get("content-type", "")
+        pdf_bytes = await request.body()
+        filename = request.headers.get("x-filename", "upload.pdf")
+        return import_pdf_bytes(pdf_bytes, filename=filename, content_type=content_type)
+    except ImportDuplasError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
     except Exception as exc:
         raise HTTPException(status_code=400, detail="Não foi possível ler o PDF.") from exc
-
-    if not pdf_bytes:
-        raise HTTPException(status_code=400, detail="Não foi possível ler o PDF.")
-
-    try:
-        parsed = parse_duplas_pdf(pdf_bytes)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail="Não foi possível ler o PDF.") from exc
-
-    duplas = parsed.get("duplas") or []
-    if not duplas:
-        raise HTTPException(status_code=400, detail="Nenhuma dupla encontrada no PDF.")
-
-    return {
-        "success": True,
-        "total": len(duplas),
-        "duplas": duplas,
-        "warnings": parsed.get("warnings") or [],
-    }
