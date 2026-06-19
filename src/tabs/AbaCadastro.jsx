@@ -11,7 +11,8 @@ export default function AbaCadastro({
   editarDupla,
   cancelarEdicao,
   removerDupla,
-  importarDuplasCsv,
+  importarDuplasPdf,
+  importandoDuplasPdf,
   formatarData,
   formatarBois,
   duplaConcluida,
@@ -19,6 +20,8 @@ export default function AbaCadastro({
   fmt,
   toast,
 }) {
+  const importacaoDesabilitada = provaFinalizada || importandoDuplasPdf;
+
   return (
     <div>
       {provaFinalizada ? (
@@ -43,19 +46,19 @@ export default function AbaCadastro({
           <Input label="🐴 Cavalo 2" value={form.cavalo2} onChange={e => setForm(p => ({ ...p, cavalo2: e.target.value }))} placeholder="Nome do cavalo" />
         </div>
         <div style={{ fontSize: "12px", color: "#B9D9C0", marginBottom: "12px" }}>
-          Importe um arquivo CSV ou Excel com duas colunas: <strong>Competidor 1</strong> e <strong>Competidor 2</strong>. Os campos de cavalo serao deixados em branco.
+          Importe um PDF com a lista de duplas da prova. O sistema vai preencher <strong>Cavaleiro 1</strong> e <strong>Cavaleiro 2</strong> automaticamente. Como o PDF não possui nome dos cavalos, os campos <strong>Cavalo 1</strong> e <strong>Cavalo 2</strong> serão preenchidos com &apos;-&apos;.
         </div>
         <div style={{ marginBottom: "18px" }}>
           <input
-            id="import-duplas-csv"
+            id="import-duplas-pdf"
             type="file"
-            accept=".pdf,.csv,.xls,.xlsx,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            onChange={importarDuplasCsv}
-            disabled={provaFinalizada}
+            accept=".pdf,application/pdf"
+            onChange={importarDuplasPdf}
+            disabled={importacaoDesabilitada}
             style={{ display: "none" }}
           />
           <label
-            htmlFor="import-duplas-csv"
+            htmlFor="import-duplas-pdf"
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -63,15 +66,16 @@ export default function AbaCadastro({
               width: "100%",
               minHeight: "48px",
               borderRadius: "12px",
-              background: provaFinalizada ? "#2A2A2A" : "#22C55E",
+              background: importacaoDesabilitada ? "#2A2A2A" : "#22C55E",
               color: "#fff",
               fontWeight: 700,
-              cursor: provaFinalizada ? "not-allowed" : "pointer",
+              cursor: importacaoDesabilitada ? "not-allowed" : "pointer",
               border: "1px solid #2A2A2A",
               textAlign: "center",
+              opacity: importandoDuplasPdf ? 0.85 : 1,
             }}
           >
-            📁 Importar planilha de duplas
+            {importandoDuplasPdf ? "⏳ Lendo PDF e importando duplas..." : "📁 Importar PDF de duplas"}
           </label>
         </div>
         <div style={{ display: "flex", gap: "10px" }}>

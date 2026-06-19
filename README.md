@@ -17,15 +17,27 @@ A documentacao tecnica e funcional completa esta em:
 
 ## Comandos
 
-- `npm run dev`
+- `npm run dev` — frontend (Vite)
+- `npm run dev:api` — API Python de importação de PDF (porta 8000)
 - `npm run build`
 - `npm run lint`
 - `npm test`
+- `npm run test:api`
+
+### Importação de duplas via PDF
+
+1. Crie o ambiente Python: `python3 -m venv .venv && .venv/bin/pip install -r api/requirements.txt`
+2. Suba a API: `npm run dev:api`
+3. Suba o frontend: `npm run dev`
+4. Na aba **Duplas**, use **Importar PDF de duplas**
+
+O frontend envia o arquivo para `POST /api/import-duplas`. Em desenvolvimento, o Vite faz proxy de `/api` para `http://127.0.0.1:8000`.
 
 ## Variaveis de ambiente
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_IMPORT_API_URL` (opcional; em dev o proxy Vite atende `/api`)
 
 ## Roteiro de demonstracao (demo)
 

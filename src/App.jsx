@@ -10,7 +10,6 @@ import AbaResultados from "./tabs/AbaResultados";
 import AbaRanking from "./tabs/AbaRanking";
 import AbaCertificados from "./tabs/AbaCertificados";
 import AbaTelao from "./tabs/AbaTelao";
-import logoExbe from "./assets/Logo_Exbe.png";
 
 // ✅ Calculado uma única vez fora do componente (não precisa re-executar a cada render)
 const urlParams = new URLSearchParams(window.location.search);
@@ -65,7 +64,7 @@ export default function RanchSortingApp() {
     medalhas, fmt, provaFinalizada,
     cavalosPremiadosDaProva, rankingCavalosDaProva, rankingCavalosGeral, rankingCompleto,
     formatarData, formatarBois, duplaConcluida, duplaSat,
-    importarDuplasCsv,
+    importarDuplasPdf, importandoDuplasPdf,
     gerarListaRankingCompleta, gerarRanking,
   } = prova;
 
@@ -180,7 +179,6 @@ export default function RanchSortingApp() {
       {/* Header */}
       <div style={{ background: "#1A1A1A", borderBottom: "1px solid #2A2A2A", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
-          <img src={logoExbe} alt="Logo" style={{ height: "38px", objectFit: "contain", mixBlendMode: "screen" }} />
           <div style={{ minWidth: 0 }}>
             <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: "clamp(15px,4vw,20px)", fontWeight: 700, color: "#F4C542", letterSpacing: "2px", textTransform: "uppercase", lineHeight: 1 }}>Ranch Sorting</div>
             <div style={{ fontSize: "10px", color: "#C98A2E", letterSpacing: "2px", textTransform: "uppercase", marginTop: "2px" }}>
@@ -249,7 +247,8 @@ export default function RanchSortingApp() {
             editandoId={editandoId} provaFinalizada={provaFinalizada}
             cadastrarDupla={cadastrarDupla} editarDupla={editarDupla}
             cancelarEdicao={cancelarEdicao} removerDupla={removerDupla}
-            importarDuplasCsv={importarDuplasCsv}
+            importarDuplasPdf={importarDuplasPdf}
+            importandoDuplasPdf={importandoDuplasPdf}
             formatarData={formatarData} formatarBois={formatarBois}
             duplaConcluida={duplaConcluida} duplaSat={duplaSat}
             fmt={fmt} toast={toast}
