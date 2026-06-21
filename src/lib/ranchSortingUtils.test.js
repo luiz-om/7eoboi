@@ -7,6 +7,7 @@ import {
   formatarBois,
   gerarListaRankingCompleta,
   gerarRanking,
+  gerarRankingTiraBoi,
   gerarRankingCavalos,
   listarCavalosPremiados,
 } from "./ranchSortingUtils.js";
@@ -33,6 +34,20 @@ function criarProva(overrides = {}) {
     ...overrides,
   };
 }
+
+test("gerarRankingTiraBoi ordena por menor tempo", () => {
+  const ranking = gerarRankingTiraBoi([
+    criarDupla({ id: "a", status: "VALIDO", bois: 5, tempo: 62.1 }),
+    criarDupla({ id: "b", status: "VALIDO", bois: 8, tempo: 45.3 }),
+    criarDupla({ id: "c", status: "VALIDO", bois: 3, tempo: 51.0 }),
+    criarDupla({ id: "d", status: "PENDENTE", bois: null, tempo: null }),
+  ]);
+
+  assert.deepEqual(
+    ranking.map((item) => item.id),
+    ["b", "c", "a"],
+  );
+});
 
 test("gerarRanking ordena por mais bois e menor tempo, ignorando SAT e pendentes", () => {
   const ranking = gerarRanking([

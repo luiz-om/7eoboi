@@ -1,6 +1,7 @@
-from fastapi import File, HTTPException, Request, UploadFile
+from urllib.parse import unquote
+
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI
 
 from api.import_service import ImportDuplasError, import_pdf_bytes
 
@@ -36,7 +37,7 @@ async def import_duplas(
 
         content_type = request.headers.get("content-type", "")
         pdf_bytes = await request.body()
-        filename = request.headers.get("x-filename", "upload.pdf")
+        filename = unquote(request.headers.get("x-filename", "upload.pdf"))
         return import_pdf_bytes(pdf_bytes, filename=filename, content_type=content_type)
     except ImportDuplasError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc

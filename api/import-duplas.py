@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from http.server import BaseHTTPRequestHandler
+from urllib.parse import unquote
 
 try:
     from api.import_service import ImportDuplasError, import_pdf_bytes
@@ -18,7 +19,7 @@ class handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         try:
             content_type = self.headers.get("Content-Type", "")
-            filename = self.headers.get("X-Filename", "upload.pdf")
+            filename = unquote(self.headers.get("X-Filename", "upload.pdf"))
             content_length = int(self.headers.get("Content-Length", "0") or 0)
             pdf_bytes = self.rfile.read(content_length) if content_length > 0 else b""
 

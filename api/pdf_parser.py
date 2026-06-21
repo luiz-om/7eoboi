@@ -313,12 +313,129 @@ def parse_lines_by_columns(lines: list[list[PdfWord]]) -> list[dict]:
     return duplas
 
 
+def parse_prova_header_from_text(text: str) -> dict:
+    lines = [normalize_cell(line) for line in text.splitlines() if normalize_cell(line)]
+    raw_text = normalize_cell(text.replace("\n", " "))
+    fields: dict[str, str] = {}
+
+    for line in lines:
+        match = re.match(r"^evento\s*:?\s*(.+)$", line, re.IGNORECASE)
+        if match and not fields.get("evento"):
+            fields["evento"] = normalize_cell(match.group(1))
+            continue
+
+        match = re.match(r"^endere(?:c|ç)o\s*:?\s*(.+)$", line, re.IGNORECASE)
+        if match and not fields.get("endereco"):
+            fields["endereco"] = normalize_cell(match.group(1))
+            continue
+
+        match = re.match(r"^cidade\s*:?\s*(.+)$", line, re.IGNORECASE)
+        if match and not fields.get("cidade"):
+            fields["cidade"] = normalize_cell(match.group(1))
+            continue
+
+        match = re.match(r"^categoria\s*:?\s*(.+?)\s+etapa\s*:?\s*(.+)$", line, re.IGNORECASE)
+        if match:
+            if not fields.get("categoria"):
+                fields["categoria"] = normalize_cell(match.group(1))
+            if not fields.get("etapa"):
+                fields["etapa"] = normalize_cell(match.group(2))
+            continue
+
+        match = re.match(r"^data\s*:?\s*(\d{4}-\d{2}-\d{2}).*?hora\s*:?\s*([\d:]+)\s*$", line, re.IGNORECASE)
+        if match:
+            fields["data"] = match.group(1)
+            fields["hora"] = match.group(2)
+            continue
+
+        combined = re.findall(
+            r"(data|hora|categoria|etapa)\s*:?\s*([^:]+?)(?=\s+(?:data|hora|categoria|etapa|passada)\s*:|\s*$)",
+            line,
+            re.IGNORECASE,
+        )
+        for label, value in combined:
+            key = label.lower()
+            cleaned = normalize_cell(value)
+            if not cleaned:
+                continue
+            if key == "data":
+                date_match = re.search(r"\d{4}-\d{2}-\d{2}", cleaned)
+                fields[key] = date_match.group(0) if date_match else cleaned
+            elif not fields.get(key):
+                fields[key] = cleaned
+
+    inline_patterns = {
+        "data": r"data\s*:?\s*(\d{4}-\d{2}-\d{2})",
+        "hora": r"hora\s*:?\s*([\d:]+)",
+        "categoria": r"categoria\s*:?\s*(.+?)(?=\s+etapa\s*:|\s+passada\b|$)",
+        "etapa": r"etapa\s*:?\s*(.+?)(?=\s+passada\b|$)",
+    }
+
+    for key, pattern in inline_patterns.items():
+        if fields.get(key):
+            continue
+        match = re.search(pattern, raw_text, re.IGNORECASE)
+        if match:
+            fields[key] = normalize_cell(match.group(1))
+
+    if not fields.get("evento"):
+        match = re.search(r"evento\s*:?\s*(.+?)(?=\s+data\s*:|\s+passada\b|$)", raw_text, re.IGNORECASE)
+        if match:
+            fields["evento"] = normalize_cell(match.group(1))
+
+    if not fields.get("endereco"):
+        match = re.search(r"endere(?:c|ç)o\s*:?\s*(.+?)(?=\s+cidade\s*:|\s+passada\b|$)", raw_text, re.IGNORECASE)
+        if match:
+            fields["endereco"] = normalize_cell(match.group(1))
+
+    if not fields.get("cidade"):
+        match = re.search(r"cidade\s*:?\s*(.+?)(?=\s+categoria\s*:|\s+passada\b|$)", raw_text, re.IGNORECASE)
+        if match:
+            fields["cidade"] = normalize_cell(match.group(1))
+
+    endereco = fields.get("endereco", "")
+    cidade = fields.get("cidade", "")
+    local_parts = [part for part in [endereco, cidade] if part]
+    local = " - ".join(local_parts) if len(local_parts) > 1 else (local_parts[0] if local_parts else "")
+
+    observacoes_parts = []
+    if fields.get("categoria"):
+        observacoes_parts.append(f"Categoria: {fields['categoria']}")
+    if fields.get("etapa"):
+        observacoes_parts.append(f"Etapa: {fields['etapa']}")
+    if fields.get("hora"):
+        observacoes_parts.append(f"Hora: {fields['hora']}")
+
+    data = fields.get("data", "")
+    if data and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", data):
+        date_match = re.search(r"\d{4}-\d{2}-\d{2}", data)
+        data = date_match.group(0) if date_match else ""
+
+    return {
+        "nome": fields.get("evento", ""),
+        "local": local,
+        "data": data,
+        "observacoes": " • ".join(observacoes_parts),
+        "evento": fields.get("evento", ""),
+        "hora": fields.get("hora", ""),
+        "endereco": endereco,
+        "cidade": cidade,
+        "categoria": fields.get("categoria", ""),
+        "etapa": fields.get("etapa", ""),
+    }
+
+
 def parse_duplas_pdf(pdf_bytes: bytes) -> dict:
     warnings: list[str] = []
     duplas: list[dict] = []
+    prova: dict = {}
 
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-        for page in pdf.pages:
+        for page_index, page in enumerate(pdf.pages):
+            page_text = page.extract_text() or ""
+            if page_index == 0 and not prova:
+                prova = parse_prova_header_from_text(page_text)
+
             settings = {
                 "vertical_strategy": "lines",
                 "horizontal_strategy": "lines",
@@ -336,7 +453,11 @@ def parse_duplas_pdf(pdf_bytes: bytes) -> dict:
                 duplas.extend(parse_lines_by_columns(lines))
 
     duplas = dedupe_duplas(duplas)
-    return {"duplas": duplas, "warnings": warnings}
+
+    if not prova.get("nome"):
+        warnings.append("Cabeçalho da prova não encontrado no PDF.")
+
+    return {"prova": prova, "duplas": duplas, "warnings": warnings}
 
 
 # Compatibilidade com testes legados de texto tabulado
