@@ -7,12 +7,11 @@ export default function AbaCadastro({
   setForm,
   editandoId,
   provaFinalizada,
+  isTiraBoi,
   cadastrarDupla,
   editarDupla,
   cancelarEdicao,
   removerDupla,
-  importarDuplasPdf,
-  importandoDuplasPdf,
   formatarData,
   formatarBois,
   duplaConcluida,
@@ -20,8 +19,6 @@ export default function AbaCadastro({
   fmt,
   toast,
 }) {
-  const importacaoDesabilitada = provaFinalizada || importandoDuplasPdf;
-
   return (
     <div>
       {provaFinalizada ? (
@@ -39,44 +36,15 @@ export default function AbaCadastro({
         <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: "13px", color: "#F4C542", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "16px" }}>
           {editandoId ? "✏️ Editar Dupla" : "＋ Nova Dupla"}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isTiraBoi ? "1fr 1fr" : "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
           <Input label="🤠 Cavaleiro 1" value={form.cavaleiro1} onChange={e => setForm(p => ({ ...p, cavaleiro1: e.target.value }))} placeholder="Nome do cavaleiro" />
-          <Input label="🐴 Cavalo 1" value={form.cavalo1} onChange={e => setForm(p => ({ ...p, cavalo1: e.target.value }))} placeholder="Nome do cavalo" />
+          {!isTiraBoi ? (
+            <Input label="🐴 Cavalo 1" value={form.cavalo1} onChange={e => setForm(p => ({ ...p, cavalo1: e.target.value }))} placeholder="Nome do cavalo" />
+          ) : null}
           <Input label="🤠 Cavaleiro 2" value={form.cavaleiro2} onChange={e => setForm(p => ({ ...p, cavaleiro2: e.target.value }))} placeholder="Nome do cavaleiro" />
-          <Input label="🐴 Cavalo 2" value={form.cavalo2} onChange={e => setForm(p => ({ ...p, cavalo2: e.target.value }))} placeholder="Nome do cavalo" />
-        </div>
-        <div style={{ fontSize: "12px", color: "#B9D9C0", marginBottom: "12px" }}>
-          Importe um PDF com a lista de duplas da prova. O sistema vai preencher <strong>Cavaleiro 1</strong> e <strong>Cavaleiro 2</strong> automaticamente. Como o PDF não possui nome dos cavalos, os campos <strong>Cavalo 1</strong> e <strong>Cavalo 2</strong> serão preenchidos com &apos;-&apos;.
-        </div>
-        <div style={{ marginBottom: "18px" }}>
-          <input
-            id="import-duplas-pdf"
-            type="file"
-            accept=".pdf,application/pdf"
-            onChange={importarDuplasPdf}
-            disabled={importacaoDesabilitada}
-            style={{ display: "none" }}
-          />
-          <label
-            htmlFor="import-duplas-pdf"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "100%",
-              minHeight: "48px",
-              borderRadius: "12px",
-              background: importacaoDesabilitada ? "#2A2A2A" : "#22C55E",
-              color: "#fff",
-              fontWeight: 700,
-              cursor: importacaoDesabilitada ? "not-allowed" : "pointer",
-              border: "1px solid #2A2A2A",
-              textAlign: "center",
-              opacity: importandoDuplasPdf ? 0.85 : 1,
-            }}
-          >
-            {importandoDuplasPdf ? "⏳ Lendo PDF e importando duplas..." : "📁 Importar PDF de duplas"}
-          </label>
+          {!isTiraBoi ? (
+            <Input label="🐴 Cavalo 2" value={form.cavalo2} onChange={e => setForm(p => ({ ...p, cavalo2: e.target.value }))} placeholder="Nome do cavalo" />
+          ) : null}
         </div>
         <div style={{ display: "flex", gap: "10px" }}>
           <Btn variant="primary" size="lg" full onClick={cadastrarDupla} disabled={provaFinalizada} style={{ opacity: provaFinalizada ? 0.5 : 1, cursor: provaFinalizada ? "not-allowed" : "pointer" }}>
@@ -97,7 +65,9 @@ export default function AbaCadastro({
           <div style={{ width: "28px", height: "28px", borderRadius: "6px", background: "#C98A2E22", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Oswald',sans-serif", fontWeight: 700, color: "#C98A2E", fontSize: "13px", flexShrink: 0 }}>{i + 1}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 600, fontSize: "13px", color: "#F0F0F0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🤠 {dp.cavaleiro1} <span style={{ color: "#C98A2E" }}>✦</span> {dp.cavaleiro2}</div>
-            <div style={{ fontSize: "11px", color: "#444", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🐴 {dp.cavalo1 || "—"} · {dp.cavalo2 || "—"}</div>
+            {!isTiraBoi ? (
+              <div style={{ fontSize: "11px", color: "#444", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🐴 {dp.cavalo1 || "—"} · {dp.cavalo2 || "—"}</div>
+            ) : null}
           </div>
           {duplaConcluida(dp) ? (
             <div style={{ flexShrink: 0, textAlign: "right" }}>

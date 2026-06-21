@@ -54,12 +54,19 @@ def import_pdf_bytes(pdf_bytes: bytes, filename: str = "", content_type: str = "
         raise ImportDuplasError("Não foi possível ler o PDF.") from exc
 
     duplas = parsed.get("duplas") or []
+    prova = parsed.get("prova") or {}
+    warnings = list(parsed.get("warnings") or [])
+
+    if not prova.get("nome"):
+        raise ImportDuplasError("Cabeçalho da prova não encontrado no PDF.")
+
     if not duplas:
         raise ImportDuplasError("Nenhuma dupla encontrada no PDF.")
 
     return {
         "success": True,
         "total": len(duplas),
+        "prova": prova,
         "duplas": duplas,
-        "warnings": parsed.get("warnings") or [],
+        "warnings": warnings,
     }

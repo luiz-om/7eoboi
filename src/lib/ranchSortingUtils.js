@@ -15,10 +15,32 @@ export function gerarRanking(duplas = []) {
     .sort((a, b) => (b.bois !== a.bois ? b.bois - a.bois : a.tempo - b.tempo));
 }
 
+export function gerarRankingTiraBoi(duplas = []) {
+  return [...duplas]
+    .filter((item) => item.status === "VALIDO" && item.tempo != null)
+    .sort((a, b) => a.tempo - b.tempo);
+}
+
 export function gerarListaRankingCompleta(duplas = []) {
   const ranking = gerarRanking(duplas);
   const sat = duplas.filter((item) => item.status === "SAT");
   return [...ranking, ...sat];
+}
+
+export function gerarListaRankingCompletaTiraBoi(duplas = []) {
+  const ranking = gerarRankingTiraBoi(duplas);
+  const sat = duplas.filter((item) => item.status === "SAT");
+  return [...ranking, ...sat];
+}
+
+export function gerarRankingPorTipo(duplas = [], tipo = "PADRAO") {
+  return tipo === "TIRA_BOI" ? gerarRankingTiraBoi(duplas) : gerarRanking(duplas);
+}
+
+export function gerarListaRankingCompletaPorTipo(duplas = [], tipo = "PADRAO") {
+  return tipo === "TIRA_BOI"
+    ? gerarListaRankingCompletaTiraBoi(duplas)
+    : gerarListaRankingCompleta(duplas);
 }
 
 export function duplaConcluida(dupla) {

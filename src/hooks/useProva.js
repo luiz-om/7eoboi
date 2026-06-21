@@ -20,14 +20,17 @@ import {
   formatarBois,
   formatarData,
   gerarListaRankingCompleta,
+  gerarListaRankingCompletaPorTipo,
   gerarRanking,
+  gerarRankingPorTipo,
   gerarRankingCavalos,
   listarCavalosPremiados,
 } from "../lib/ranchSortingUtils";
+import { getModulosVisiveis, isTiraBoi, labelTipoProva, normalizarTipoProva, TIPOS_PROVA } from "../lib/tipoProva";
 import { supabase } from "../lib/supabase";
-import { importDuplasFromPdf, isPdfFile, mapearDuplasImportadas } from "../lib/importDuplasApi";
+import { importDuplasFromPdf, isPdfFile, mapearDuplasImportadas, mapearProvaImportada } from "../lib/importDuplasApi";
 
-export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao }) {
+export function useProva({ isTelaoWindow, provaIdTelao, tipoTelao, toast, abrirConfirmacao }) {
   const [sessao, setSessao] = useState(null);
   const [authCarregando, setAuthCarregando] = useState(true);
   const [authProcessando, setAuthProcessando] = useState(false);
@@ -43,12 +46,14 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     local: "",
     data: new Date().toISOString().slice(0, 10),
     observacoes: "",
+    tipo: TIPOS_PROVA.PADRAO,
+    duplasCorte: "",
   });
   const [erroConexao, setErroConexao] = useState("");
   const [editandoId, setEditandoId] = useState(null);
   const [editandoResultadoId, setEditandoResultadoId] = useState(null);
   const [editandoProvaId, setEditandoProvaId] = useState(null);
-  const [importandoDuplasPdf, setImportandoDuplasPdf] = useState(false);
+  const [importandoProvaPdf, setImportandoProvaPdf] = useState(false);
 
   // ✅ useRef para timeout evita stale closure
   const timeoutRef = useRef(null);
@@ -150,15 +155,14 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     // ✅ carregarDados agora é estável via useCallback
   }, [isTelaoWindow, provaIdTelao, sessao, carregarDados, toast]);
 
-  // Auto-selecionar primeira prova
+  // Mantém prova em execução válida após carregar dados
   useEffect(() => {
     if (!provas.length) {
-      setProvaAtualId("");
+      if (provaAtualId) setProvaAtualId("");
       return;
     }
-    if (!provaAtualId || !provas.some((prova) => prova.id === provaAtualId)) {
-      setProvaAtualId(provas[0].id);
-    }
+    if (provaAtualId && provas.some((prova) => prova.id === provaAtualId)) return;
+    setProvaAtualId(provas[0].id);
   }, [provas, provaAtualId]);
 
   // ─── Auth handlers ─────────────────────────────────────────────────────────
@@ -199,27 +203,52 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
 
   // ─── Prova CRUD ────────────────────────────────────────────────────────────
   const resetarFormProva = useCallback(() => {
-    setProvaForm({ nome: "", local: "", data: new Date().toISOString().slice(0, 10), observacoes: "" });
+    setProvaForm((atual) => ({
+      nome: "",
+      local: "",
+      data: new Date().toISOString().slice(0, 10),
+      observacoes: "",
+      tipo: atual.tipo,
+      duplasCorte: normalizarTipoProva(atual.tipo) === TIPOS_PROVA.TIRA_BOI ? atual.duplasCorte : "",
+    }));
     setEditandoProvaId(null);
   }, []);
 
+  function montarPayloadProva(form) {
+    const tipo = normalizarTipoProva(form.tipo);
+    const duplasCorte = Number(form.duplasCorte);
+    return {
+      nome: form.nome,
+      local: form.local,
+      data: form.data,
+      observacoes: form.observacoes,
+      tipo,
+      duplasCorte: tipo === TIPOS_PROVA.TIRA_BOI && duplasCorte > 0 ? duplasCorte : null,
+    };
+  }
+
   async function salvarProva() {
     if (!provaForm.nome.trim()) { toast("Informe o nome da prova.", "erro"); return; }
+    if (normalizarTipoProva(provaForm.tipo) === TIPOS_PROVA.TIRA_BOI && !Number(provaForm.duplasCorte)) {
+      toast("Informe quantas duplas vão para o corte.", "erro");
+      return;
+    }
     try {
+      const payload = montarPayloadProva(provaForm);
       if (editandoProvaId) {
         const provaExistente = provas.find((p) => p.id === editandoProvaId);
         await updateProva(editandoProvaId, {
-          ...provaForm,
+          ...payload,
           finalizada: Boolean(provaExistente?.finalizada),
           finalizadaEm: provaExistente?.finalizadaEm ?? null,
         });
         await carregarDados(editandoProvaId);
         toast("Prova atualizada!");
       } else {
-        const novaProva = await createProva(provaForm);
+        const novaProva = await createProva(payload);
         await carregarDados(novaProva.id);
         setProvaAtualId(novaProva.id);
-        toast("Prova cadastrada!");
+        toast("Prova cadastrada e fixada para execução!");
       }
       resetarFormProva();
     } catch (error) { toast(error.message || "Nao foi possivel salvar a prova.", "erro"); }
@@ -235,12 +264,27 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
       local: prova.local || "",
       data: prova.data || new Date().toISOString().slice(0, 10),
       observacoes: prova.observacoes || "",
+      tipo: normalizarTipoProva(prova.tipo),
+      duplasCorte: prova.duplasCorte ?? "",
     });
     setEditandoProvaId(prova.id);
   }
 
   function selecionarProva(id) {
     setProvaAtualId(id);
+    if (id) {
+      const prova = provas.find((item) => item.id === id);
+      if (prova) {
+        setProvaForm((atual) => ({
+          ...atual,
+          tipo: normalizarTipoProva(prova.tipo),
+          duplasCorte: prova.duplasCorte ?? "",
+        }));
+        if (!isTelaoWindow) {
+          toast(`Prova "${prova.nome}" fixada para execução.`);
+        }
+      }
+    }
     setEditandoId(null);
     setEditandoResultadoId(null);
     setResultadoForm({ duplaId: "", bois: "", tempo: "" });
@@ -278,7 +322,8 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
         try {
           await updateProva(provaAlvo.id, {
             nome: provaAlvo.nome, local: provaAlvo.local, data: provaAlvo.data,
-            observacoes: provaAlvo.observacoes, finalizada: true,
+            observacoes: provaAlvo.observacoes, tipo: provaAlvo.tipo, duplasCorte: provaAlvo.duplasCorte,
+            finalizada: true,
             finalizadaEm: new Date().toISOString(),
           });
           resetarFormProva();
@@ -297,34 +342,35 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
   // ─── Dupla CRUD ────────────────────────────────────────────────────────────
 
   const provaAtual = provas.find((prova) => prova.id === provaAtualId) ?? null;
-  const duplas = provaAtual?.duplas ?? [];
-  const provaFinalizada = Boolean(provaAtual?.finalizada);
+  const tipoProvaAtual = normalizarTipoProva(
+    isTelaoWindow
+      ? (tipoTelao || provaAtual?.tipo || provaForm.tipo)
+      : (provaAtual?.tipo ?? provaForm.tipo),
+  );
+  const isTiraBoiAtual = tipoProvaAtual === TIPOS_PROVA.TIRA_BOI;
+  const provaAtualEfetiva = provaAtual;
+  const duplas = provaAtualEfetiva?.duplas ?? [];
+  const provaFinalizada = Boolean(provaAtualEfetiva?.finalizada);
 
   // ─── Derivados ─────────────────────────────────────────────────────────────
-  const ranking = gerarRanking(duplas);
+  const ranking = gerarRankingPorTipo(duplas, tipoProvaAtual);
   const semResultado = duplas.filter((d) => !duplaConcluida(d));
   const comResultado = duplas.filter((d) => duplaConcluida(d));
   const proximaDupla = duplas.find((d) => !duplaConcluida(d)) ?? null;
   const medalhas = ["🥇", "🥈", "🥉"];
   const fmt = (t) => (t == null ? "—" : t.toFixed(3) + "s");
-  const cavalosPremiadosDaProva = listarCavalosPremiados(provaAtual);
-  const rankingCavalosDaProva = gerarRankingCavalos(provas, { provaId: provaAtualId });
+  const cavalosPremiadosDaProva = listarCavalosPremiados(provaAtualEfetiva);
+  const rankingCavalosDaProva = gerarRankingCavalos(provas, { provaId: provaAtualEfetiva?.id });
   const rankingCavalosGeral = gerarRankingCavalos(provas, { apenasFinalizadas: true });
-  const rankingCompleto = gerarListaRankingCompleta(duplas);
+  const rankingCompleto = gerarListaRankingCompletaPorTipo(duplas, tipoProvaAtual);
+  const duplasClassificadasCorte = isTiraBoiAtual && provaAtualEfetiva?.duplasCorte
+    ? ranking.slice(0, provaAtualEfetiva.duplasCorte)
+    : [];
 
-  async function importarDuplasPdf(event) {
+  async function importarProvaPdf(event) {
     const arquivo = event?.target?.files?.[0];
     if (!arquivo) return;
     event.target.value = "";
-
-    if (!provaAtual) {
-      toast("Selecione ou crie uma prova antes de importar duplas.", "erro");
-      return;
-    }
-    if (provaFinalizada) {
-      toast("Prova finalizada. Nao e permitido alterar duplas.", "erro");
-      return;
-    }
 
     if (!(await isPdfFile(arquivo))) {
       toast("Formato de PDF não reconhecido.", "erro");
@@ -332,21 +378,29 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     }
 
     try {
-      setImportandoDuplasPdf(true);
+      setImportandoProvaPdf(true);
       const resultado = await importDuplasFromPdf(arquivo);
+      const provaPayload = mapearProvaImportada(resultado.prova, {
+        tipo: provaForm.tipo,
+        duplasCorte: Number(provaForm.duplasCorte) || null,
+      });
       const duplasImportadas = mapearDuplasImportadas(resultado.duplas);
 
-      if (!resultado.success || !duplasImportadas.length) {
-        toast("Nenhuma dupla encontrada no PDF.", "erro");
+      if (!resultado.success || !provaPayload || !duplasImportadas.length) {
+        toast("Não foi possível importar a prova do PDF.", "erro");
+        return;
+      }
+      if (provaPayload.tipo === TIPOS_PROVA.TIRA_BOI && !provaPayload.duplasCorte) {
+        toast("Informe quantas duplas vão para o corte antes de importar.", "erro");
         return;
       }
 
-      const ordemBase = duplas.reduce((max, dp) => Math.max(max, dp.ordem || 0), 0);
+      const novaProva = await createProva(provaPayload);
       for (let i = 0; i < duplasImportadas.length; i += 1) {
         const item = duplasImportadas[i];
         await createDupla({
-          provaId: provaAtual.id,
-          ordem: item.passada ?? ordemBase + i + 1,
+          provaId: novaProva.id,
+          ordem: item.passada ?? i + 1,
           cavaleiro1: item.cavaleiro1,
           cavalo1: item.cavalo1,
           cavaleiro2: item.cavaleiro2,
@@ -357,28 +411,40 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
         });
       }
 
-      await carregarDados(provaAtual.id);
-      toast(`PDF importado com sucesso. ${resultado.total} duplas encontradas.`);
+      setEditandoProvaId(null);
+      setProvaForm({
+        nome: "",
+        local: "",
+        data: new Date().toISOString().slice(0, 10),
+        observacoes: "",
+        tipo: provaPayload.tipo,
+        duplasCorte: provaPayload.duplasCorte ?? "",
+      });
+      await carregarDados(novaProva.id);
+      setProvaAtualId(novaProva.id);
+      toast(`Prova "${provaPayload.nome}" criada com ${resultado.total} duplas e fixada para execução.`);
     } catch (error) {
       toast(error?.message || "Não foi possível ler o PDF.", "erro");
     } finally {
-      setImportandoDuplasPdf(false);
+      setImportandoProvaPdf(false);
     }
   }
 
   async function cadastrarDupla() {
-    if (!provaAtual) { toast("Cadastre ou selecione uma prova primeiro.", "erro"); return; }
+    if (!provaAtualEfetiva) { toast("Selecione uma prova em execução na aba Provas.", "erro"); return; }
     if (provaFinalizada) { toast("Prova finalizada. Nao e permitido alterar duplas.", "erro"); return; }
     const { cavaleiro1, cavalo1, cavaleiro2, cavalo2 } = form;
     if (!cavaleiro1 || !cavaleiro2) { toast("Informe os dois competidores.", "erro"); return; }
+    const cavalo1Final = isTiraBoiAtual ? "-" : cavalo1;
+    const cavalo2Final = isTiraBoiAtual ? "-" : cavalo2;
     try {
       if (editandoId) {
         const duplaAtual = duplas.find((dp) => dp.id === editandoId);
         await updateDupla(editandoId, {
           cavaleiro1,
-          cavalo1,
+          cavalo1: cavalo1Final,
           cavaleiro2,
-          cavalo2,
+          cavalo2: cavalo2Final,
           status: duplaAtual?.status ?? "PENDENTE",
           bois: duplaAtual?.bois ?? null,
           tempo: duplaAtual?.tempo ?? null,
@@ -388,12 +454,12 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
       } else {
         const ordem = duplas.reduce((max, dp) => Math.max(max, dp.ordem || 0), 0) + 1;
         await createDupla({
-          provaId: provaAtual.id,
+          provaId: provaAtualEfetiva.id,
           ordem,
           cavaleiro1,
-          cavalo1,
+          cavalo1: cavalo1Final,
           cavaleiro2,
-          cavalo2,
+          cavalo2: cavalo2Final,
           status: "PENDENTE",
           bois: null,
           tempo: null,
@@ -401,7 +467,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
         toast("Dupla cadastrada!");
       }
       setForm({ cavaleiro1: "", cavalo1: "", cavaleiro2: "", cavalo2: "" });
-      await carregarDados(provaAtual.id);
+      await carregarDados(provaAtualEfetiva.id);
     } catch (error) { toast(error.message || "Nao foi possivel salvar a dupla.", "erro"); }
   }
 
@@ -428,7 +494,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
           await deleteDupla(id);
           if (editandoId === id) cancelarEdicao();
           if (editandoResultadoId === id) cancelarEdicaoResultado();
-          await carregarDados(provaAtual?.id || null);
+          await carregarDados(provaAtualEfetiva?.id || null);
           toast("Dupla removida!");
         } catch (error) { toast(error.message || "Nao foi possivel remover a dupla.", "erro"); }
       },
@@ -438,7 +504,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
   // ─── Resultado ─────────────────────────────────────────────────────────────
 
   async function salvarResultado() {
-    if (!provaAtual) { toast("Cadastre ou selecione uma prova primeiro.", "erro"); return; }
+    if (!provaAtualEfetiva) { toast("Selecione uma prova em execução na aba Provas.", "erro"); return; }
     if (provaFinalizada) { toast("Prova finalizada. Nao e permitido alterar resultados.", "erro"); return; }
     const { duplaId, bois, tempo } = resultadoForm;
     if (!duplaId || bois === "" || tempo === "") { toast("Preencha todos os campos!", "erro"); return; }
@@ -451,7 +517,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
       await updateResultadoDupla(duplaId, { status: "VALIDO", bois: b, tempo: t });
       setResultadoForm({ duplaId: "", bois: "", tempo: "" });
       setEditandoResultadoId(null);
-      await carregarDados(provaAtual.id);
+      await carregarDados(provaAtualEfetiva.id);
       toast(era ? "Resultado atualizado!" : "Resultado registrado!");
     } catch (error) { toast(error.message || "Nao foi possivel salvar o resultado.", "erro"); }
   }
@@ -478,7 +544,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
         try {
           await updateResultadoDupla(id, { status: "PENDENTE", bois: null, tempo: null });
           if (editandoResultadoId === id) cancelarEdicaoResultado();
-          await carregarDados(provaAtual?.id || null);
+          await carregarDados(provaAtualEfetiva?.id || null);
           toast("Resultado removido!");
         } catch (error) { toast(error.message || "Nao foi possivel limpar o resultado.", "erro"); }
       },
@@ -486,7 +552,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
   }
 
   async function registrarSAT({ tempoTelao, setTimerRodando, setTempoInicial, resetarRodada, setBoisTelao, setBoisErro }) {
-    if (!provaAtual) { toast("Cadastre ou selecione uma prova primeiro.", "erro"); return; }
+    if (!provaAtualEfetiva) { toast("Selecione uma prova em execução na aba Provas.", "erro"); return; }
     const atual = duplas.find(d => !duplaConcluida(d));
     if (!atual) { toast("Nenhuma dupla pendente para marcar SAT.", "erro"); return; }
     const [segundos, milisegundos] = tempoTelao.split(".").map(Number);
@@ -495,7 +561,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     setTempoInicial(null);
     try {
       await updateResultadoDupla(atual.id, { status: "SAT", bois: null, tempo: tempoEmSegundos });
-      await carregarDados(provaAtual.id);
+      await carregarDados(provaAtualEfetiva.id);
       toast(`Dupla marcada como SAT: ${atual.cavaleiro1}`);
       resetarRodada();
       setBoisTelao("");
@@ -515,7 +581,7 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     const tempoEmSegundos = (segundos || 0) + ((milisegundos || 0) / 1000);
     try {
       await updateResultadoDupla(atual.id, { status: "VALIDO", bois: boisFinais, tempo: tempoEmSegundos });
-      await carregarDados(provaAtual?.id || null);
+      await carregarDados(provaAtualEfetiva?.id || null);
       toast(`Dupla finalizada: ${atual.cavaleiro1} — ${boisFinais} bois em ${tempoFinalStr}s`);
       resetarRodada();
       setBoisTelao("");
@@ -543,33 +609,47 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
   }
 
   function exportarRankingProva(prova) {
-    const rankingProva = gerarListaRankingCompleta(prova?.duplas || []);
+    const rankingProva = gerarListaRankingCompletaPorTipo(prova?.duplas || [], prova?.tipo);
     if (!prova || rankingProva.length === 0) { toast("Nenhum resultado para exportar.", "erro"); return false; }
-    const cabecalho = ["Prova", "Data", "Posicao", "Cavaleiro 1", "Cavalo 1", "Cavaleiro 2", "Cavalo 2", "Bois", "Tempo (s)"].join(";");
-    const linhas = rankingProva.map((dp, index) => [
-      escaparCsv(prova.nome), escaparCsv(formatarData(prova.data)),
-      duplaSat(dp) ? "SAT" : index + 1, escaparCsv(dp.cavaleiro1), escaparCsv(dp.cavalo1),
-      escaparCsv(dp.cavaleiro2), escaparCsv(dp.cavalo2),
-      duplaSat(dp) ? "SAT" : dp.bois, duplaSat(dp) ? "" : Number(dp.tempo).toFixed(3),
-    ].join(";"));
+    const tiraBoi = isTiraBoi(prova);
+    const cabecalho = tiraBoi
+      ? ["Prova", "Data", "Posicao", "Cavaleiro 1", "Cavalo 1", "Cavaleiro 2", "Cavalo 2", "Tempo (s)", "Bois", "Classificada Corte"].join(";")
+      : ["Prova", "Data", "Posicao", "Cavaleiro 1", "Cavalo 1", "Cavaleiro 2", "Cavalo 2", "Bois", "Tempo (s)"].join(";");
+    let posicaoValida = 0;
+    const linhas = rankingProva.map((dp) => {
+      if (duplaSat(dp)) {
+        return tiraBoi
+          ? [escaparCsv(prova.nome), escaparCsv(formatarData(prova.data)), "SAT", escaparCsv(dp.cavaleiro1), escaparCsv(dp.cavalo1), escaparCsv(dp.cavaleiro2), escaparCsv(dp.cavalo2), "", "SAT", ""].join(";")
+          : [escaparCsv(prova.nome), escaparCsv(formatarData(prova.data)), "SAT", escaparCsv(dp.cavaleiro1), escaparCsv(dp.cavalo1), escaparCsv(dp.cavaleiro2), escaparCsv(dp.cavalo2), "SAT", ""].join(";");
+      }
+      posicaoValida += 1;
+      const classificada = tiraBoi && prova.duplasCorte && posicaoValida <= prova.duplasCorte ? "Sim" : "Nao";
+      return tiraBoi
+        ? [escaparCsv(prova.nome), escaparCsv(formatarData(prova.data)), posicaoValida, escaparCsv(dp.cavaleiro1), escaparCsv(dp.cavalo1), escaparCsv(dp.cavaleiro2), escaparCsv(dp.cavalo2), Number(dp.tempo).toFixed(3), dp.bois ?? "", classificada].join(";")
+        : [escaparCsv(prova.nome), escaparCsv(formatarData(prova.data)), posicaoValida, escaparCsv(dp.cavaleiro1), escaparCsv(dp.cavalo1), escaparCsv(dp.cavaleiro2), escaparCsv(dp.cavalo2), dp.bois, Number(dp.tempo).toFixed(3)].join(";");
+    });
     const csv = `\uFEFF${[cabecalho, ...linhas].join("\n")}`;
     baixarArquivo(new Blob([csv], { type: "text/csv;charset=utf-8;" }), gerarNomeArquivoResultados(prova));
     return true;
   }
 
-  function exportarResultadosExcel() { return exportarRankingProva(provaAtual); }
+  function exportarResultadosExcel() { return exportarRankingProva(provaAtualEfetiva); }
 
   async function copiarResultadoWhatsApp({ rankingCompleto, medalhas, fmt }) {
-    if (!provaAtual || !rankingCompleto.length) { toast("Nenhum resultado para copiar.", "erro"); return; }
+    if (!provaAtualEfetiva || !rankingCompleto.length) { toast("Nenhum resultado para copiar.", "erro"); return; }
     const dataHora = new Date().toLocaleString("pt-BR");
     let posicaoValida = 0;
     const linhasRanking = rankingCompleto.map((dp) => {
       if (duplaSat(dp)) return `SAT ${dp.cavaleiro1} & ${dp.cavaleiro2} - SAT`;
       const prefixo = medalhas[posicaoValida] || `${posicaoValida + 1}.`;
       posicaoValida += 1;
+      if (isTiraBoiAtual) {
+        const corte = provaAtualEfetiva.duplasCorte && posicaoValida <= provaAtualEfetiva.duplasCorte ? " ✂️" : "";
+        return `${prefixo} ${dp.cavaleiro1} & ${dp.cavaleiro2} - ${fmt(dp.tempo)}${corte}`;
+      }
       return `${prefixo} ${dp.cavaleiro1} & ${dp.cavaleiro2} - ${dp.bois} bois em ${Number(dp.tempo).toFixed(3)}s`;
     });
-    const texto = [`*${provaAtual.nome}*`, `${formatarData(provaAtual.data)}${provaAtual.local ? ` • ${provaAtual.local}` : ""}`, `Encerrado em ${dataHora}`, "", ...linhasRanking].join("\n");
+    const texto = [`*${provaAtualEfetiva.nome}*`, `${formatarData(provaAtualEfetiva.data)}${provaAtualEfetiva.local ? ` • ${provaAtualEfetiva.local}` : ""}`, `Encerrado em ${dataHora}`, "", ...linhasRanking].join("\n");
     try {
       if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(texto); }
       else {
@@ -583,10 +663,10 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
   }
 
   function imprimirCertificadoCavalo(item) {
-    if (!provaAtual) return;
+    if (!provaAtualEfetiva) return;
     const popup = window.open("", "_blank", "width=1100,height=800");
     if (!popup) { toast("Nao foi possivel abrir a janela do certificado.", "erro"); return; }
-    const html = `<html><head><title>Certificado - ${item.cavalo}</title><style>body{margin:0;font-family:Georgia,serif;background:#f2ead3}.sheet{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;box-sizing:border-box}.cert{width:100%;max-width:960px;background:linear-gradient(135deg,#fff7dd,#f4ead0);border:14px solid #8b5e1a;outline:4px solid #d4a017;padding:56px 64px;box-sizing:border-box;text-align:center}.eyebrow{font-size:16px;letter-spacing:5px;text-transform:uppercase;color:#8b5e1a}.title{font-size:54px;color:#5a3a12;margin:18px 0 24px}.horse{font-size:50px;font-weight:700;color:#2b2112;margin:18px 0}.text{font-size:24px;line-height:1.6;color:#4b3a21}.highlight{color:${item.cor};font-weight:700}.footer{margin-top:42px;font-size:18px;color:#6b5530}</style></head><body><div class="sheet"><div class="cert"><div class="eyebrow">Certificado Oficial</div><div class="title">Ranch Sorting</div><div class="text">Certificamos que o cavalo</div><div class="horse">${item.cavalo}</div><div class="text">montado por <span class="highlight">${item.cavaleiro}</span>, conquistou o <span class="highlight">${item.titulo}</span> na prova <span class="highlight">${provaAtual.nome}</span>.</div><div class="footer">${formatarData(provaAtual.data)}${provaAtual.local ? ` • ${provaAtual.local}` : ""}</div></div></div><script>window.onload=()=>window.print();</script></body></html>`;
+    const html = `<html><head><title>Certificado - ${item.cavalo}</title><style>body{margin:0;font-family:Georgia,serif;background:#f2ead3}.sheet{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;box-sizing:border-box}.cert{width:100%;max-width:960px;background:linear-gradient(135deg,#fff7dd,#f4ead0);border:14px solid #8b5e1a;outline:4px solid #d4a017;padding:56px 64px;box-sizing:border-box;text-align:center}.eyebrow{font-size:16px;letter-spacing:5px;text-transform:uppercase;color:#8b5e1a}.title{font-size:54px;color:#5a3a12;margin:18px 0 24px}.horse{font-size:50px;font-weight:700;color:#2b2112;margin:18px 0}.text{font-size:24px;line-height:1.6;color:#4b3a21}.highlight{color:${item.cor};font-weight:700}.footer{margin-top:42px;font-size:18px;color:#6b5530}</style></head><body><div class="sheet"><div class="cert"><div class="eyebrow">Certificado Oficial</div><div class="title">Ranch Sorting</div><div class="text">Certificamos que o cavalo</div><div class="horse">${item.cavalo}</div><div class="text">montado por <span class="highlight">${item.cavaleiro}</span>, conquistou o <span class="highlight">${item.titulo}</span> na prova <span class="highlight">${provaAtualEfetiva.nome}</span>.</div><div class="footer">${formatarData(provaAtualEfetiva.data)}${provaAtualEfetiva.local ? ` • ${provaAtualEfetiva.local}` : ""}</div></div></div><script>window.onload=()=>window.print();</script></body></html>`;
     popup.document.open(); popup.document.write(html); popup.document.close();
   }
 
@@ -602,11 +682,13 @@ export function useProva({ isTelaoWindow, provaIdTelao, toast, abrirConfirmacao 
     salvarResultado, iniciarEdicaoResultado, cancelarEdicaoResultado, limparResultado,
     registrarSAT, finalizarDuplaAtual,
     exportarRankingProva, exportarResultadosExcel, copiarResultadoWhatsApp, imprimirCertificadoCavalo,
-    provaAtual, duplas, ranking, semResultado, comResultado, proximaDupla,
+    provaAtual: provaAtualEfetiva, duplas, ranking, semResultado, comResultado, proximaDupla,
     medalhas, fmt, provaFinalizada,
     cavalosPremiadosDaProva, rankingCavalosDaProva, rankingCavalosGeral, rankingCompleto,
     formatarData, formatarBois, duplaConcluida, duplaSat,
-    importarDuplasPdf, importandoDuplasPdf,
-    gerarRanking, gerarListaRankingCompleta,
+    importarProvaPdf, importandoProvaPdf,
+    tipoProvaAtual, isTiraBoiAtual, duplasClassificadasCorte,
+    getModulosVisiveis, labelTipoProva, TIPOS_PROVA,
+    gerarRanking, gerarListaRankingCompleta, gerarRankingPorTipo, gerarListaRankingCompletaPorTipo,
   };
 }

@@ -67,6 +67,25 @@ export async function importDuplasFromPdf(file) {
   return data;
 }
 
+import { inferirTipoProva, normalizarTipoProva, resolverTipoImportacao } from "./tipoProva.js";
+
+export function mapearProvaImportada(provaApi, overrides = {}) {
+  if (!provaApi) return null;
+
+  const hoje = new Date().toISOString().slice(0, 10);
+  const tipo = resolverTipoImportacao(provaApi, overrides.tipo);
+  const duplasCorte = overrides.duplasCorte ?? null;
+
+  return {
+    nome: provaApi.nome || provaApi.evento || "Prova importada do PDF",
+    local: provaApi.local || "",
+    data: provaApi.data || hoje,
+    observacoes: provaApi.observacoes || "",
+    tipo,
+    duplasCorte: tipo === "TIRA_BOI" ? duplasCorte : null,
+  };
+}
+
 export function mapearDuplasImportadas(duplasApi) {
   return (duplasApi || []).map((item) => ({
     cavaleiro1: item.competitor1Name,

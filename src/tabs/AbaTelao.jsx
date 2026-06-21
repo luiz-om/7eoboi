@@ -18,6 +18,7 @@ export default function AbaTelao({
   comResultado,
   semResultado,
   proximaDupla,
+  isTiraBoi,
   timerRodando,
   tempoTelao,
   boisTelao,
@@ -146,10 +147,12 @@ export default function AbaTelao({
       {proximaDupla ? (
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "12px", marginBottom: "16px" }}>
           <div style={{ background: "#0F2F0F", borderRadius: "12px", padding: "16px", border: "2px solid #22C55E", boxShadow: "0 0 20px rgba(34, 197, 94, 0.15)" }}>
-            <div style={{ fontSize: "14px", color: "#22C55E", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px", fontFamily: "'Oswald',sans-serif", fontWeight: 700 }}>🐴 DUPLA ATUAL</div>
+            <div style={{ fontSize: "14px", color: "#22C55E", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px", fontFamily: "'Oswald',sans-serif", fontWeight: 700 }}>{isTiraBoi ? "🤠 DUPLA ATUAL" : "🐴 DUPLA ATUAL"}</div>
             <div style={{ background: "#0B0B0B", borderRadius: "8px", padding: "14px", border: "1px solid #22C55E33" }}>
-              <div style={{ fontSize: "16px", fontWeight: 700, color: "#22C55E", fontFamily: "'Oswald',sans-serif", marginBottom: "8px" }}>{proximaDupla.cavaleiro1} <span style={{ color: "#666" }}>&</span> {proximaDupla.cavaleiro2}</div>
-              <div style={{ fontSize: "13px", color: "#888", fontFamily: "'Oswald',sans-serif" }}>🐴 {proximaDupla.cavalo1} <span style={{ color: "#555" }}>·</span> {proximaDupla.cavalo2}</div>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: "#22C55E", fontFamily: "'Oswald',sans-serif", marginBottom: isTiraBoi ? 0 : "8px" }}>{proximaDupla.cavaleiro1} <span style={{ color: "#666" }}>&</span> {proximaDupla.cavaleiro2}</div>
+              {!isTiraBoi ? (
+                <div style={{ fontSize: "13px", color: "#888", fontFamily: "'Oswald',sans-serif" }}>🐴 {proximaDupla.cavalo1} <span style={{ color: "#555" }}>·</span> {proximaDupla.cavalo2}</div>
+              ) : null}
             </div>
           </div>
 
@@ -157,8 +160,10 @@ export default function AbaTelao({
             <div style={{ background: "#1F1F0F", borderRadius: "12px", padding: "12px", border: "1px solid #C98A2E", boxShadow: "0 0 15px rgba(201, 138, 46, 0.1)" }}>
               <div style={{ fontSize: "15px", color: "#C98A2E", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px", fontFamily: "'Oswald',sans-serif", fontWeight: 700 }}>➡️ PRÓXIMA</div>
               <div style={{ background: "#0B0B0B", borderRadius: "6px", padding: "10px", border: "1px solid #C98A2E22" }}>
-                <div style={{ fontSize: "20px", fontWeight: 700, color: "#C98A2E", fontFamily: "'Oswald',sans-serif", marginBottom: "4px", lineHeight: 1.2 }}>{semResultado[1]?.cavaleiro1} <span style={{ color: "#555" }}>&</span> {semResultado[1]?.cavaleiro2}</div>
-                <div style={{ fontSize: "10px", color: "#666", fontFamily: "'Oswald',sans-serif", lineHeight: 1.1 }}>🐴 {semResultado[1]?.cavalo1} · {semResultado[1]?.cavalo2}</div>
+                <div style={{ fontSize: "20px", fontWeight: 700, color: "#C98A2E", fontFamily: "'Oswald',sans-serif", marginBottom: isTiraBoi ? 0 : "4px", lineHeight: 1.2 }}>{semResultado[1]?.cavaleiro1} <span style={{ color: "#555" }}>&</span> {semResultado[1]?.cavaleiro2}</div>
+                {!isTiraBoi ? (
+                  <div style={{ fontSize: "10px", color: "#666", fontFamily: "'Oswald',sans-serif", lineHeight: 1.1 }}>🐴 {semResultado[1]?.cavalo1} · {semResultado[1]?.cavalo2}</div>
+                ) : null}
               </div>
             </div>
           ) : (

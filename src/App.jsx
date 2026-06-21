@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import ArenaScreen from "./ArenaScreen";
 import AuthScreen from "./components/auth/AuthScreen";
 import { Btn, ConfirmDialog, EmptyState, ModernTab, StatCard } from "./components/ui";
@@ -10,11 +10,13 @@ import AbaResultados from "./tabs/AbaResultados";
 import AbaRanking from "./tabs/AbaRanking";
 import AbaCertificados from "./tabs/AbaCertificados";
 import AbaTelao from "./tabs/AbaTelao";
+import { getModulosVisiveis, labelTipoProva } from "./lib/tipoProva";
 
 // ✅ Calculado uma única vez fora do componente (não precisa re-executar a cada render)
 const urlParams = new URLSearchParams(window.location.search);
 const IS_TELAO_WINDOW = urlParams.get("telao") === "true";
 const PROVA_ID_TELAO = urlParams.get("prova") || "";
+const TIPO_TELAO = urlParams.get("tipo") || "";
 
 export default function RanchSortingApp() {
   const [aba, setAba] = useState("provas");
@@ -45,6 +47,7 @@ export default function RanchSortingApp() {
   const prova = useProva({
     isTelaoWindow: IS_TELAO_WINDOW,
     provaIdTelao: PROVA_ID_TELAO,
+    tipoTelao: TIPO_TELAO,
     toast,
     abrirConfirmacao,
   });
@@ -64,8 +67,9 @@ export default function RanchSortingApp() {
     medalhas, fmt, provaFinalizada,
     cavalosPremiadosDaProva, rankingCavalosDaProva, rankingCavalosGeral, rankingCompleto,
     formatarData, formatarBois, duplaConcluida, duplaSat,
-    importarDuplasPdf, importandoDuplasPdf,
-    gerarListaRankingCompleta, gerarRanking,
+    importarProvaPdf, importandoProvaPdf,
+    tipoProvaAtual, isTiraBoiAtual, duplasClassificadasCorte,
+    gerarListaRankingCompleta, gerarListaRankingCompletaPorTipo, gerarRanking,
   } = prova;
 
   const {
@@ -79,9 +83,21 @@ export default function RanchSortingApp() {
     const params = new URLSearchParams();
     params.set("telao", "true");
     if (prova.provaAtualId) params.set("prova", prova.provaAtualId);
+    params.set("tipo", tipoProvaAtual);
     const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
-    window.open(url, "telao", "width=1920,height=1080,fullscreen=yes");
-  }, [prova.provaAtualId]);
+    window.open(url, "telao_ranchsorting", "noopener,noreferrer");
+  }, [prova.provaAtualId, tipoProvaAtual]);
+
+  const modulosVisiveis = useMemo(
+    () => getModulosVisiveis(tipoProvaAtual),
+    [tipoProvaAtual],
+  );
+
+  useEffect(() => {
+    if (!modulosVisiveis.includes(aba)) {
+      setAba(modulosVisiveis.includes("cadastro") ? "cadastro" : modulosVisiveis[0] || "provas");
+    }
+  }, [tipoProvaAtual, aba, modulosVisiveis]);
 
   // ─── Loading / Auth / Error screens ────────────────────────────────────────
 
@@ -136,8 +152,12 @@ export default function RanchSortingApp() {
         timerRodando={timerRodando}
         nomeProva={provaAtual?.nome || "Ranch Sorting"}
         provaFinalizada={provaFinalizada}
+        isTiraBoi={isTiraBoiAtual}
         boiAtual={boiAtual}
         contadorBois={contadorBois}
+        rodadaIniciada={rodadaIniciada}
+        parciais={parciais}
+        boisUsados={boisUsados}
         tempoFinalizado={!timerRodando && tempoTelao !== "00.000" && parseInt(boisTelao) > 0}
         boisFinalizados={parseInt(boisTelao) || 0}
       />
@@ -146,7 +166,7 @@ export default function RanchSortingApp() {
 
   // ─── Tabs ──────────────────────────────────────────────────────────────────
 
-  const tabs = [
+  const ALL_TABS = [
     { id: "provas", label: "Provas", icon: "📁" },
     { id: "cadastro", label: "Duplas", icon: "🤠" },
     { id: "resultados", label: "Prova", icon: "⏱️" },
@@ -154,6 +174,8 @@ export default function RanchSortingApp() {
     { id: "certificados", label: "Certificados", icon: "📜" },
     { id: "telao", label: "Controle", icon: "🎬" },
   ];
+
+  const tabs = ALL_TABS.filter((tab) => modulosVisiveis.includes(tab.id));
 
   return (
     <div style={{ minHeight: "100vh", background: "#121212", color: "#E0E0E0", fontFamily: "'Inter',system-ui,sans-serif" }}>
@@ -182,7 +204,9 @@ export default function RanchSortingApp() {
           <div style={{ minWidth: 0 }}>
             <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: "clamp(15px,4vw,20px)", fontWeight: 700, color: "#F4C542", letterSpacing: "2px", textTransform: "uppercase", lineHeight: 1 }}>Ranch Sorting</div>
             <div style={{ fontSize: "10px", color: "#C98A2E", letterSpacing: "2px", textTransform: "uppercase", marginTop: "2px" }}>
-              {provaAtual ? `${provaAtual.nome} • ${formatarData(provaAtual.data)}` : "Selecione ou cadastre uma prova"}
+              {provaAtual
+                ? `${labelTipoProva(tipoProvaAtual)} • ${provaAtual.nome} • ${formatarData(provaAtual.data)}`
+                : `${labelTipoProva(tipoProvaAtual)} • Selecione ou cadastre uma prova`}
             </div>
           </div>
         </div>
@@ -225,10 +249,12 @@ export default function RanchSortingApp() {
             salvarProva={salvarProva} resetarFormProva={resetarFormProva}
             selecionarProva={selecionarProva} editarProva={editarProva}
             finalizarProva={finalizarProva} removerProva={removerProva}
+            importarProvaPdf={importarProvaPdf}
+            importandoProvaPdf={importandoProvaPdf}
             exportarRankingProva={exportarRankingProva}
             toast={toast} formatarData={formatarData} formatarBois={formatarBois}
             duplaSat={duplaSat} duplaConcluida={duplaConcluida}
-            gerarListaRankingCompleta={gerarListaRankingCompleta} gerarRanking={gerarRanking}
+            gerarListaRankingCompletaPorTipo={gerarListaRankingCompletaPorTipo}
             medalhas={medalhas} fmt={fmt}
           />
         )}
@@ -245,10 +271,9 @@ export default function RanchSortingApp() {
             provaAtual={provaAtual} duplas={duplas}
             form={form} setForm={setForm}
             editandoId={editandoId} provaFinalizada={provaFinalizada}
+            isTiraBoi={isTiraBoiAtual}
             cadastrarDupla={cadastrarDupla} editarDupla={editarDupla}
             cancelarEdicao={cancelarEdicao} removerDupla={removerDupla}
-            importarDuplasPdf={importarDuplasPdf}
-            importandoDuplasPdf={importandoDuplasPdf}
             formatarData={formatarData} formatarBois={formatarBois}
             duplaConcluida={duplaConcluida} duplaSat={duplaSat}
             fmt={fmt} toast={toast}
@@ -276,6 +301,8 @@ export default function RanchSortingApp() {
             provaAtual={provaAtual}
             rankingCompleto={rankingCompleto} ranking={ranking}
             semResultado={semResultado} provaFinalizada={provaFinalizada}
+            isTiraBoi={isTiraBoiAtual}
+            duplasClassificadasCorte={duplasClassificadasCorte}
             exportarResultadosExcel={exportarResultadosExcel}
             copiarResultadoWhatsApp={() => copiarResultadoWhatsApp({ rankingCompleto, medalhas, fmt })}
             medalhas={medalhas} fmt={fmt}
@@ -300,6 +327,7 @@ export default function RanchSortingApp() {
             provaAtual={provaAtual} duplas={duplas}
             comResultado={comResultado} semResultado={semResultado}
             proximaDupla={proximaDupla}
+            isTiraBoi={isTiraBoiAtual}
             timerRodando={timerRodando} tempoTelao={tempoTelao}
             boisTelao={boisTelao} boiAtual={boiAtual}
             contadorBois={contadorBois} rodadaIniciada={rodadaIniciada}

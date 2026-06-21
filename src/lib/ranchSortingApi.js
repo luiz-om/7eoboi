@@ -1,7 +1,62 @@
 import { supabase } from "./supabase";
+import { normalizarTipoProva, TIPOS_PROVA, inferirTipoProva, extrairTipoDasObservacoes, embutirTipoNasObservacoes } from "./tipoProva.js";
 
-const PROVAS_COLUMNS = "id, nome, local, data, observacoes, finalizada, finalizada_em, criada_em, updated_at, owner_id";
+const PROVAS_COLUMNS_BASE = "id, nome, local, data, observacoes, finalizada, finalizada_em, criada_em, updated_at, owner_id";
+const PROVAS_COLUMNS_FULL = `${PROVAS_COLUMNS_BASE}, tipo, duplas_corte`;
 const DUPLAS_COLUMNS = "id, prova_id, ordem, cavaleiro1, cavalo1, cavaleiro2, cavalo2, status, bois, tempo, criada_em, updated_at";
+
+let schemaTipoProva = null;
+
+function isColunaInexistente(error) {
+  return error?.code === "42703" || /does not exist/i.test(error?.message || "");
+}
+
+async function getProvasColumns() {
+  if (schemaTipoProva === true) return PROVAS_COLUMNS_FULL;
+  if (schemaTipoProva === false) return PROVAS_COLUMNS_BASE;
+
+  const { error } = await supabase.from("provas").select("tipo, duplas_corte").limit(0);
+  if (!error) {
+    schemaTipoProva = true;
+    return PROVAS_COLUMNS_FULL;
+  }
+  if (isColunaInexistente(error)) {
+    schemaTipoProva = false;
+    return PROVAS_COLUMNS_BASE;
+  }
+  throw tratarErro(error, "Nao foi possivel verificar o schema das provas.");
+}
+
+function montarPayloadProvaBanco(payload, incluirTipo) {
+  const tipo = normalizarTipoProva(payload.tipo);
+  const duplasCorte = payload.duplasCorte ?? null;
+  const observacoesBase = payload.observacoes ?? "";
+  const observacoes = incluirTipo
+    ? observacoesBase
+    : embutirTipoNasObservacoes(observacoesBase, tipo, duplasCorte);
+
+  const base = {
+    nome: payload.nome,
+    local: payload.local,
+    data: payload.data,
+    observacoes,
+  };
+  if (!incluirTipo) return base;
+  return {
+    ...base,
+    tipo,
+    duplas_corte: duplasCorte,
+  };
+}
+
+function montarUpdateProvaBanco(payload, incluirTipo) {
+  const base = montarPayloadProvaBanco(payload, incluirTipo);
+  return {
+    ...base,
+    finalizada: payload.finalizada,
+    finalizada_em: payload.finalizadaEm,
+  };
+}
 
 function normalizarStatus(valor) {
   if (valor === "VALIDO" || valor === "SAT") return valor;
@@ -38,12 +93,24 @@ function normalizarDupla(row) {
 }
 
 function normalizarProva(row, duplas = []) {
+  const extra = extrairTipoDasObservacoes(row.observacoes ?? "");
+  const tipoColuna = row.tipo == null ? null : normalizarTipoProva(row.tipo);
+  const duplasCorteColuna = row.duplas_corte == null ? null : Number(row.duplas_corte);
+
+  const tipoInferido = inferirTipoProva({
+    categoria: row.categoria,
+    observacoes: row.observacoes,
+    nome: row.nome,
+  });
+
   return {
     id: row.id,
     nome: row.nome,
     local: row.local ?? "",
     data: row.data,
-    observacoes: row.observacoes ?? "",
+    observacoes: extra.observacoes,
+    tipo: tipoColuna ?? extra.tipo ?? tipoInferido,
+    duplasCorte: duplasCorteColuna ?? extra.duplasCorte,
     criadaEm: row.criada_em,
     updatedAt: row.updated_at,
     finalizada: Boolean(row.finalizada),
@@ -94,8 +161,9 @@ export async function signOut() {
 }
 
 export async function listProvasComDuplas() {
+  const provasColumns = await getProvasColumns();
   const [{ data: provasRows, error: provasError }, { data: duplasRows, error: duplasError }] = await Promise.all([
-    supabase.from("provas").select(PROVAS_COLUMNS).order("data", { ascending: false }).order("criada_em", { ascending: false }),
+    supabase.from("provas").select(provasColumns).order("data", { ascending: false }).order("criada_em", { ascending: false }),
     supabase.from("duplas").select(DUPLAS_COLUMNS).order("ordem", { ascending: true }),
   ]);
 
@@ -114,15 +182,12 @@ export async function listProvasComDuplas() {
 }
 
 export async function createProva(payload) {
+  const provasColumns = await getProvasColumns();
+  const incluirTipo = schemaTipoProva === true;
   const { data, error } = await supabase
     .from("provas")
-    .insert({
-      nome: payload.nome,
-      local: payload.local,
-      data: payload.data,
-      observacoes: payload.observacoes,
-    })
-    .select(PROVAS_COLUMNS)
+    .insert(montarPayloadProvaBanco(payload, incluirTipo))
+    .select(provasColumns)
     .single();
 
   if (error) throw tratarErro(error, "Nao foi possivel criar a prova.");
@@ -130,18 +195,13 @@ export async function createProva(payload) {
 }
 
 export async function updateProva(id, payload) {
+  const provasColumns = await getProvasColumns();
+  const incluirTipo = schemaTipoProva === true;
   const { data, error } = await supabase
     .from("provas")
-    .update({
-      nome: payload.nome,
-      local: payload.local,
-      data: payload.data,
-      observacoes: payload.observacoes,
-      finalizada: payload.finalizada,
-      finalizada_em: payload.finalizadaEm,
-    })
+    .update(montarUpdateProvaBanco(payload, incluirTipo))
     .eq("id", id)
-    .select(PROVAS_COLUMNS)
+    .select(provasColumns)
     .single();
 
   if (error) throw tratarErro(error, "Nao foi possivel atualizar a prova.");
